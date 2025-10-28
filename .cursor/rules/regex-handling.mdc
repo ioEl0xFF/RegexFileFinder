@@ -1,0 +1,195 @@
+---
+title: "正規表現処理ルール"
+description: "正規表現のバリデーション、ユーザー入力のサニタイズ、パフォーマンス最適化、エラーメッセージ、テストケース、特殊文字エスケープ、ファイル検索最適化に関するガイドライン"
+tags:
+  ["正規表現", "バリデーション", "サニタイズ", "パフォーマンス", "セキュリティ"]
+alwaysApply: true
+---
+
+# 正規表現処理ルール
+
+## 適用タイミング
+
+- 正規表現を扱うコードを書く際
+- ユーザー入力を処理する際
+- fileSearchService.ts を編集する際
+- 正規表現関連のバグ修正時
+
+## 基本的なルール
+
+### 1. 正規表現のバリデーション
+
+- ユーザー入力の正規表現は必ず try-catch で検証する
+- 無効なパターンの場合は分かりやすいエラーメッセージを表示する
+- テスト用のサンプルパターンを提供する
+
+```typescript
+// 良い例
+function validateRegexPattern(pattern: string): RegExp {
+  try {
+    return new RegExp(pattern);
+  } catch (error) {
+    throw new Error(`無効な正規表現パターンです: "${pattern}"\n例: .*\\.tsx$`);
+  }
+}
+
+// 悪い例
+function validateRegexPattern(pattern: string): RegExp {
+  return new RegExp(pattern); // エラーハンドリングなし
+}
+```
+
+### 2. ユーザー入力のサニタイズ
+
+- 危険なパターン（ReDoS 攻撃など）を事前にチェックする
+- 過度に複雑なパターンは警告を表示する
+- 入力長の制限を設ける
+
+```typescript
+// 良い例
+function sanitizeRegexPattern(pattern: string): string {
+  // 長すぎるパターンをチェック
+  if (pattern.length > 1000) {
+    throw new Error("正規表現パターンが長すぎます（1000文字以内）");
+  }
+
+  // 危険なパターンをチェック（例：ネストした量指定子）
+  if (/(\w+){10,}/.test(pattern)) {
+    throw new Error("パフォーマンス上の理由で、このパターンは使用できません");
+  }
+
+  return pattern.trim();
+}
+```
+
+### 3. パフォーマンスを考慮した正規表現パターン
+
+- 効率的なパターンを設計する
+- 不要なバックトラッキングを避ける
+- 大量のファイルを処理する際は適切な最適化を行う
+
+```typescript
+// 良い例 - 効率的なパターン
+const EXTENSION_PATTERN = /\.(ts|tsx|js|jsx)$/i; // シンプルで高速
+
+// 悪い例 - 非効率なパターン
+const INEFFICIENT_PATTERN = /.*\.(ts|tsx|js|jsx).*$/i; // 不要な.*で非効率
+```
+
+### 4. エラーメッセージの分かりやすさ
+
+- エラーメッセージは日本語で記述する
+- 具体的な修正方法を提示する
+- サンプルパターンを提供する
+
+```typescript
+// 良い例
+function showRegexError(error: Error, pattern: string): void {
+  const message = `正規表現エラー: ${error.message}\n\n入力されたパターン: "${pattern}"\n\n例:\n• .*\\.tsx$ - TSXファイル\n• ^test.*\\.js$ - testで始まるJSファイル\n• .*component.* - "component"を含むファイル`;
+
+  vscode.window.showErrorMessage(message);
+}
+```
+
+### 5. テストケースの重要性
+
+- エッジケースを含む包括的なテストを書く
+- 特殊文字、Unicode 文字、空文字列などをテストする
+- パフォーマンステストも含める
+
+```typescript
+// 良い例 - テストケース
+describe("RegexPatternValidator", () => {
+  test("有効なパターン", () => {
+    expect(() => validateRegexPattern(".*\\.ts$")).not.toThrow();
+  });
+
+  test("無効なパターン", () => {
+    expect(() => validateRegexPattern("[unclosed")).toThrow();
+  });
+
+  test("空文字列", () => {
+    expect(() => validateRegexPattern("")).toThrow();
+  });
+
+  test("特殊文字", () => {
+    expect(() => validateRegexPattern(".*[\\[\\](){}].*")).not.toThrow();
+  });
+});
+```
+
+### 6. 特殊文字のエスケープ処理
+
+- ユーザーが入力した文字列を正規表現として使用する場合は適切にエスケープする
+- ファイル名検索では通常、リテラル文字列検索もサポートする
+
+```typescript
+// 良い例
+function createRegexFromLiteralString(literal: string): RegExp {
+  // 特殊文字をエスケープ
+  const escaped = literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(escaped);
+}
+
+function createRegexFromPattern(
+  pattern: string,
+  isLiteral: boolean = false
+): RegExp {
+  if (isLiteral) {
+    return createRegexFromLiteralString(pattern);
+  } else {
+    return new RegExp(pattern);
+  }
+}
+```
+
+### 7. ファイル検索の最適化
+
+- ファイル拡張子で事前フィルタリングを行う
+- 不要なディレクトリ（node_modules 等）を除外する
+- 並列処理を適切に使用する
+
+```typescript
+// 良い例
+async function searchFilesWithRegex(
+  pattern: RegExp,
+  rootPath: string
+): Promise<string[]> {
+  // まずファイル拡張子でフィルタリング
+  const files = await vscode.workspace.findFiles(
+    "**/*.{ts,tsx,js,jsx,json,md}",
+    "**/node_modules/**"
+  );
+
+  const results: string[] = [];
+  const batchSize = 100;
+
+  for (let i = 0; i < files.length; i += batchSize) {
+    const batch = files.slice(i, i + batchSize);
+    const batchResults = batch
+      .map((file) => file.fsPath)
+      .filter((path) => pattern.test(path));
+
+    results.push(...batchResults);
+
+    // UIをブロックしないように制御を譲る
+    if (i + batchSize < files.length) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  }
+
+  return results;
+}
+```
+
+## プロジェクト固有の制約事項
+
+- RegexFileFinder はファイル名検索に特化している
+- ファイル内容の検索は対象外
+- VS Code の設定（files.exclude, search.exclude）を尊重する
+- 大量のファイルがあるプロジェクトでもパフォーマンスを維持する
+
+## 参考資料
+
+- [Regular Expressions - MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions)
+- [ReDoS 攻撃について](https://owasp.org/www-community/attacks/Regular_expression_Denial_of_Service_-_ReDoS)

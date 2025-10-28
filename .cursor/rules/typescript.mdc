@@ -1,0 +1,195 @@
+---
+title: "TypeScript 開発ルール"
+description: "strictモードの遵守、型安全性、インターフェースと型エイリアスの使い分け、async/awaitの適切な使用、エラーハンドリング、nullチェック、ジェネリクスに関するガイドライン"
+tags: ["TypeScript", "型安全性", "strict", "async/await", "エラーハンドリング"]
+alwaysApply: true
+---
+
+# TypeScript 開発ルール
+
+## 適用タイミング
+
+- 新しいファイルを作成する際
+- 関数やクラスを実装する際
+- リファクタリング時
+- コードレビュー時
+
+## 基本的なルール
+
+### 1. strict モードの遵守
+
+- `tsconfig.json`の`strict: true`設定を維持する
+- 型安全性を最優先に考える
+- `any`型の使用は最小限に抑える
+
+```typescript
+// 良い例
+interface SearchResult {
+  filePath: string;
+  fileName: string;
+  matchCount: number;
+}
+
+function processSearchResults(results: SearchResult[]): void {
+  // 型安全な処理
+}
+
+// 悪い例
+function processSearchResults(results: any[]): void {
+  // any型は避ける
+}
+```
+
+### 2. 型定義の明示
+
+- 関数の戻り値型を必ず明記する
+- 引数の型を明確に定義する
+- 変数の型を推論に頼らず明示する（複雑な場合）
+
+```typescript
+// 良い例
+async function searchFiles(
+  pattern: string,
+  rootPath: string
+): Promise<string[]> {
+  const results: string[] = [];
+  // 処理...
+  return results;
+}
+
+// 悪い例
+async function searchFiles(pattern, rootPath) {
+  const results = [];
+  // 処理...
+  return results;
+}
+```
+
+### 3. インターフェースと型エイリアスの使い分け
+
+- オブジェクトの構造を定義する場合は`interface`を使用
+- ユニオン型やプリミティブ型のエイリアスには`type`を使用
+- 拡張可能性を考慮して`interface`を優先する
+
+```typescript
+// 良い例 - interface
+interface FileItem {
+  label: string;
+  resourceUri: vscode.Uri;
+  collapsibleState: vscode.TreeItemCollapsibleState;
+}
+
+// 良い例 - type
+type SearchPattern = string;
+type FileExtension = ".ts" | ".tsx" | ".js" | ".jsx";
+```
+
+### 4. async/await の適切な使用
+
+- Promise チェーンよりも async/await を優先する
+- エラーハンドリングは try-catch で行う
+- 並列処理が必要な場合は`Promise.all`を使用する
+
+```typescript
+// 良い例
+async function performSearch(pattern: string): Promise<void> {
+  try {
+    const files = await vscode.workspace.findFiles("**/*");
+    const filteredFiles = await filterFilesByPattern(files, pattern);
+    await updateTreeView(filteredFiles);
+  } catch (error) {
+    vscode.window.showErrorMessage(`検索エラー: ${error.message}`);
+  }
+}
+
+// 悪い例
+function performSearch(pattern: string): void {
+  vscode.workspace
+    .findFiles("**/*")
+    .then((files) => filterFilesByPattern(files, pattern))
+    .then((filteredFiles) => updateTreeView(filteredFiles))
+    .catch((error) =>
+      vscode.window.showErrorMessage(`検索エラー: ${error.message}`)
+    );
+}
+```
+
+### 5. エラーハンドリングのパターン
+
+- try-catch-finally を適切に使用する
+- カスタムエラークラスを作成してエラーの種類を区別する
+- エラーメッセージは日本語で分かりやすく記述する
+
+```typescript
+// 良い例
+class RegexError extends Error {
+  constructor(message: string, public readonly pattern: string) {
+    super(message);
+    this.name = "RegexError";
+  }
+}
+
+async function validateRegex(pattern: string): Promise<void> {
+  try {
+    new RegExp(pattern);
+  } catch (error) {
+    throw new RegexError(`無効な正規表現パターン: ${pattern}`, pattern);
+  }
+}
+```
+
+### 6. null チェックと Optional Chaining
+
+- null/undefined の可能性がある値は適切にチェックする
+- Optional Chaining (`?.`) を活用する
+- Non-null assertion (`!`) は慎重に使用する
+
+```typescript
+// 良い例
+function getFileExtension(filePath: string): string | undefined {
+  const match = filePath.match(/\.([^.]+)$/);
+  return match?.[1];
+}
+
+// 悪い例
+function getFileExtension(filePath: string): string {
+  const match = filePath.match(/\.([^.]+)$/);
+  return match[1]; // matchがnullの場合にエラー
+}
+```
+
+### 7. ジェネリクスの適切な使用
+
+- 型安全性を保ちながら再利用性を高める
+- 制約（constraints）を適切に設定する
+- 複雑になりすぎないよう注意する
+
+```typescript
+// 良い例
+interface Repository<T> {
+  findById(id: string): Promise<T | undefined>;
+  save(entity: T): Promise<void>;
+}
+
+class FileRepository implements Repository<FileItem> {
+  async findById(id: string): Promise<FileItem | undefined> {
+    // 実装...
+  }
+
+  async save(entity: FileItem): Promise<void> {
+    // 実装...
+  }
+}
+```
+
+## プロジェクト固有の制約事項
+
+- VS Code API の型定義（`@types/vscode`）を適切に活用する
+- 正規表現の型安全性を考慮した設計を行う
+- ファイルパスの処理では`vscode.Uri`を使用する
+- 非同期処理では適切なエラーハンドリングを実装する
+
+## 参考資料
+
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+- [VS Code TypeScript API](https://code.visualstudio.com/api/references/vscode-api)

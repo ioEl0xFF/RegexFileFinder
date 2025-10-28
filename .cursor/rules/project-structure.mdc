@@ -1,0 +1,213 @@
+---
+title: "プロジェクト構造とアーキテクチャルール"
+description: "ディレクトリ構成、責任分離、ファイル命名規則、モジュール間依存関係、インポート順序、型定義管理、設定分離、エラーハンドリング統一に関するガイドライン"
+tags: ["プロジェクト構造", "アーキテクチャ", "責任分離", "命名規則", "依存関係"]
+alwaysApply: true
+---
+
+# プロジェクト構造とアーキテクチャルール
+
+## 適用タイミング
+
+- 新しいファイルやディレクトリを作成する際
+- モジュールを追加する際
+- リファクタリング時
+- アーキテクチャの見直し時
+
+## 基本的なルール
+
+### 1. ディレクトリ構成
+
+プロジェクトのディレクトリ構造は以下のように整理する：
+
+```
+src/
+├── commands/          # コマンド実装
+│   └── searchCommand.ts
+├── providers/         # TreeDataProvider等のプロバイダー
+│   └── fileTreeProvider.ts
+├── services/          # ビジネスロジック
+│   └── fileSearchService.ts
+├── types/            # 型定義
+│   └── index.ts
+└── extension.ts      # エントリーポイント
+```
+
+### 2. 責任分離の原則（Single Responsibility）
+
+各モジュールは単一の責任を持つように設計する：
+
+```typescript
+// 良い例 - 責任が明確に分離されている
+// commands/searchCommand.ts - コマンドの実行のみ
+export function registerSearchCommand(
+  context: vscode.ExtensionContext,
+  treeProvider: FileTreeProvider
+): void {
+  const disposable = vscode.commands.registerCommand(
+    "regexFileFinder.search",
+    async () => {
+      const pattern = await vscode.window.showInputBox({
+        prompt: "正規表現パターンを入力",
+      });
+      if (pattern) {
+        await treeProvider.searchFiles(pattern);
+      }
+    }
+  );
+  context.subscriptions.push(disposable);
+}
+
+// services/fileSearchService.ts - ファイル検索ロジックのみ
+export class FileSearchService {
+  async searchFiles(pattern: string): Promise<string[]> {
+    // 検索ロジック
+  }
+}
+
+// providers/fileTreeProvider.ts - UI表示のみ
+export class FileTreeProvider implements vscode.TreeDataProvider<FileItem> {
+  // TreeDataProviderの実装
+}
+```
+
+### 3. ファイル命名規則
+
+- TypeScript ファイルは`camelCase.ts`形式を使用
+- クラス名は`PascalCase`
+- 関数・変数名は`camelCase`
+- 定数は`UPPER_SNAKE_CASE`
+
+```typescript
+// 良い例
+// ファイル名: fileSearchService.ts
+export class FileSearchService {
+  private readonly MAX_RESULTS = 1000;
+
+  async searchFiles(pattern: string): Promise<string[]> {
+    // 実装
+  }
+}
+```
+
+### 4. モジュール間の依存関係
+
+依存関係は以下の方向に限定する：
+
+```
+extension.ts
+    ↓
+commands/ → providers/ → services/
+    ↓           ↓           ↓
+types/ ← types/ ← types/
+```
+
+- `commands`は`providers`と`types`に依存可能
+- `providers`は`services`と`types`に依存可能
+- `services`は`types`のみに依存可能
+- `types`は他のモジュールに依存しない
+
+```typescript
+// 良い例 - 依存関係が適切
+// commands/searchCommand.ts
+import { FileTreeProvider } from "../providers/fileTreeProvider";
+import { SearchResult } from "../types";
+
+// providers/fileTreeProvider.ts
+import { FileSearchService } from "../services/fileSearchService";
+import { FileItem } from "../types";
+
+// services/fileSearchService.ts
+import { SearchResult } from "../types";
+```
+
+### 5. インポート順序
+
+インポートは以下の順序で記述する：
+
+```typescript
+// 1. VS Code API
+import * as vscode from "vscode";
+
+// 2. 外部ライブラリ（現在は使用していない）
+// import axios from 'axios';
+
+// 3. 内部モジュール（相対パス）
+import { FileSearchService } from "../services/fileSearchService";
+import { FileTreeProvider } from "../providers/fileTreeProvider";
+
+// 4. 型定義
+import type { FileItem, SearchResult } from "../types";
+```
+
+### 6. 型定義の管理
+
+型定義は`types/index.ts`に集約し、必要に応じて分割する：
+
+```typescript
+// types/index.ts
+export interface FileItem {
+  label: string;
+  resourceUri: vscode.Uri;
+  collapsibleState: vscode.TreeItemCollapsibleState;
+}
+
+export interface SearchResult {
+  filePath: string;
+  fileName: string;
+  matchCount: number;
+}
+
+export type SearchPattern = string;
+export type FileExtension = ".ts" | ".tsx" | ".js" | ".jsx";
+```
+
+### 7. 設定とコンフィギュレーション
+
+設定関連のコードは適切に分離する：
+
+```typescript
+// 良い例 - 設定を分離
+export class ConfigService {
+  static getExcludePatterns(): string[] {
+    const config = vscode.workspace.getConfiguration("files");
+    return config.get("exclude") || {};
+  }
+
+  static getSearchExcludePatterns(): string[] {
+    const config = vscode.workspace.getConfiguration("search");
+    return config.get("exclude") || {};
+  }
+}
+```
+
+### 8. エラーハンドリングの統一
+
+エラーハンドリングは統一されたパターンを使用する：
+
+```typescript
+// 良い例 - 統一されたエラーハンドリング
+export class ErrorHandler {
+  static handleSearchError(error: Error, pattern: string): void {
+    console.error("Search error:", error);
+    vscode.window.showErrorMessage(`検索エラー: ${error.message}`);
+  }
+
+  static handleValidationError(error: Error): void {
+    console.error("Validation error:", error);
+    vscode.window.showWarningMessage(`入力エラー: ${error.message}`);
+  }
+}
+```
+
+## プロジェクト固有の制約事項
+
+- RegexFileFinder は単一機能の拡張機能として設計
+- 複雑な依存関係は避け、シンプルな構造を維持
+- VS Code 拡張機能の制約（バンドルサイズ、パフォーマンス）を考慮
+- 将来の機能拡張を考慮した柔軟な設計
+
+## 参考資料
+
+- [VS Code Extension Structure](https://code.visualstudio.com/api/extension-guides/overview)
+- [Clean Architecture Principles](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)

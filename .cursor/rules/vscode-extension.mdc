@@ -1,0 +1,164 @@
+---
+title: "VS Code 拡張機能開発ルール"
+description: "VS Code拡張機能のライフサイクル管理、コマンド登録、TreeDataProvider実装、APIの適切な使用方法、パフォーマンス最適化、メモリリーク防止に関するガイドライン"
+tags:
+  [
+    "VS Code",
+    "拡張機能開発",
+    "TreeDataProvider",
+    "パフォーマンス",
+    "メモリ管理",
+  ]
+alwaysApply: true
+---
+
+# VS Code 拡張機能開発ルール
+
+## 適用タイミング
+
+- 新しいコマンドやビューを追加する際
+- extension.ts を編集する際
+- VS Code API を使用する際
+- パフォーマンス問題が発生した際
+
+## 基本的なルール
+
+### 1. 拡張機能のライフサイクル管理
+
+- `activate`関数では必要なリソースのみを初期化する
+- `deactivate`関数では適切にリソースをクリーンアップする
+- `Disposable`オブジェクトは`context.subscriptions`に登録する
+
+```typescript
+// 良い例
+export function activate(context: vscode.ExtensionContext) {
+  const treeProvider = new FileTreeProvider();
+  const disposable = vscode.window.registerTreeDataProvider(
+    "regexFileFinder.results",
+    treeProvider
+  );
+  context.subscriptions.push(disposable);
+}
+
+// 悪い例
+export function activate(context: vscode.ExtensionContext) {
+  // Disposableを登録せずにメモリリークの原因となる
+  vscode.window.registerTreeDataProvider(
+    "regexFileFinder.results",
+    new FileTreeProvider()
+  );
+}
+```
+
+### 2. コマンド ID の命名規則
+
+- コマンド ID は`regexFileFinder.xxx`形式で統一する
+- 動詞は英語、名詞は機能を表す明確な名前を使用する
+
+```typescript
+// 良い例
+"command": "regexFileFinder.search"
+"command": "regexFileFinder.clearResults"
+
+// 悪い例
+"command": "search"
+"command": "regexFileFinderSearch"
+```
+
+### 3. TreeDataProvider の実装パターン
+
+- `getTreeItem`と`getChildren`メソッドを適切に実装する
+- 大量のデータを扱う場合は仮想化を考慮する
+- 更新時は`_onDidChangeTreeData.fire()`を呼び出す
+
+```typescript
+// 良い例
+export class FileTreeProvider implements vscode.TreeDataProvider<FileItem> {
+  private _onDidChangeTreeData: vscode.EventEmitter<
+    FileItem | undefined | null | void
+  > = new vscode.EventEmitter<FileItem | undefined | null | void>();
+  readonly onDidChangeTreeData: vscode.Event<
+    FileItem | undefined | null | void
+  > = this._onDidChangeTreeData.event;
+
+  refresh(): void {
+    this._onDidChangeTreeData.fire();
+  }
+}
+```
+
+### 4. VS Code API の適切な使用
+
+- `vscode.window.showInputBox`でユーザー入力を取得する
+- `vscode.workspace.findFiles`でファイル検索を行う
+- エラー時は`vscode.window.showErrorMessage`でユーザーに通知する
+
+```typescript
+// 良い例
+const pattern = await vscode.window.showInputBox({
+  prompt: "正規表現パターンを入力してください",
+  placeHolder: "例: .*\\.tsx$",
+});
+
+if (!pattern) {
+  return; // ユーザーがキャンセルした場合
+}
+```
+
+### 5. パフォーマンス最適化
+
+- 大量のファイルを処理する際は`setTimeout`や`setImmediate`で非同期処理を分割する
+- 不要なファイル検索を避けるため、適切なフィルタリングを行う
+- メモリ使用量を監視し、必要に応じてキャッシュをクリアする
+
+```typescript
+// 良い例
+async function processLargeFileList(files: string[]): Promise<void> {
+  const batchSize = 100;
+  for (let i = 0; i < files.length; i += batchSize) {
+    const batch = files.slice(i, i + batchSize);
+    await processBatch(batch);
+
+    // UIをブロックしないように次のイベントループに制御を譲る
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+}
+```
+
+### 6. メモリリーク防止
+
+- `Disposable`オブジェクトは必ず`dispose()`メソッドを実装する
+- イベントリスナーは適切に削除する
+- タイマーやインターバルはクリーンアップする
+
+```typescript
+// 良い例
+export class FileSearchService implements vscode.Disposable {
+  private _disposables: vscode.Disposable[] = [];
+
+  constructor() {
+    const disposable = vscode.workspace.onDidChangeConfiguration(
+      this.onConfigChange,
+      this
+    );
+    this._disposables.push(disposable);
+  }
+
+  dispose(): void {
+    this._disposables.forEach((d) => d.dispose());
+    this._disposables = [];
+  }
+}
+```
+
+## プロジェクト固有の制約事項
+
+- RegexFileFinder はファイル検索に特化した拡張機能
+- 正規表現の処理は`fileSearchService.ts`に集約する
+- 検索結果の表示は`fileTreeProvider.ts`で管理する
+- コマンドの実装は`commands`ディレクトリに分離する
+
+## 参考資料
+
+- [VS Code Extension API Documentation](https://code.visualstudio.com/api)
+- [VS Code Extension Guidelines](https://code.visualstudio.com/api/extension-guides/overview)
