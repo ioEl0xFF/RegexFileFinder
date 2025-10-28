@@ -5,6 +5,14 @@
 このファイルの形式は [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) に基づいており、
 このプロジェクトは [Semantic Versioning](https://semver.org/spec/v2.0.0.html) に従います。
 
+## [0.2.0] - 2025-01-28
+
+### 改善
+
+- パフォーマンスの最適化
+- エラーハンドリングの強化
+- ユーザビリティの向上
+
 ## [0.1.0] - 2025-01-28
 
 ### 追加
