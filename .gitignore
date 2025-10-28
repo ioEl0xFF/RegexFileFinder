@@ -1,0 +1,12 @@
+node_modules
+out
+dist
+*.vsix
+*.tgz
+.vscode-test
+.vscode
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
