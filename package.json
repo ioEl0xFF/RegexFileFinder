@@ -28,25 +28,49 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:regexFileFinder.search"
+    "onView:regexFileFinder.searchView"
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "regexFileFinder.search",
-        "title": "ファイル名を正規表現で検索",
-        "category": "Regex File Finder"
-      }
-    ],
-    "views": {
-      "explorer": [
+    "viewsContainers": {
+      "activitybar": [
         {
-          "id": "regexFileFinder.results",
-          "name": "正規表現検索結果"
+          "id": "regexFileFinder",
+          "title": "Regex File Finder",
+          "icon": "resources/icon.svg"
         }
       ]
-    }
+    },
+    "views": {
+      "regexFileFinder": [
+        {
+          "id": "regexFileFinder.searchView",
+          "name": "ファイル検索"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "regexFileFinder.editSearchPattern",
+        "title": "検索文字列を編集"
+      },
+      {
+        "command": "regexFileFinder.editIncludePattern",
+        "title": "含めるファイルを編集"
+      },
+      {
+        "command": "regexFileFinder.editExcludePattern",
+        "title": "除外するファイルを編集"
+      },
+      {
+        "command": "regexFileFinder.executeSearch",
+        "title": "検索を実行"
+      },
+      {
+        "command": "regexFileFinder.clearResults",
+        "title": "検索結果をクリア"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

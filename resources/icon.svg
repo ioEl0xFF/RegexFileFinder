@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 虫眼鏡の円 -->
+  <circle cx="10" cy="10" r="7"/>
+  <!-- 虫眼鏡の柄 -->
+  <line x1="15" y1="15" x2="21" y2="21"/>
+  <!-- 正規表現の記号 .* -->
+  <text x="7" y="12" font-size="8" fill="currentColor" text-anchor="middle">.*</text>
+</svg>
