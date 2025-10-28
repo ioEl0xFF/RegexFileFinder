@@ -18,6 +18,9 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(treeView);
   console.log('[RegexFileFinder] TreeView登録完了');
 
+  // TreeViewインスタンスをプロバイダーに設定
+  searchTreeProvider.setTreeView(treeView);
+
   // コマンドの登録
   registerSearchCommands(context, searchTreeProvider);
 

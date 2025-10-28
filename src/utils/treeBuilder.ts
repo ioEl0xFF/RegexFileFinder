@@ -42,7 +42,7 @@ export function buildFileTree(files: vscode.Uri[]): TreeNode[] {
             type: 'folder',
             label: part,
             children: [],
-            collapsibleState: vscode.TreeItemCollapsibleState.Collapsed
+            collapsibleState: vscode.TreeItemCollapsibleState.Expanded
           };
           nodeMap.set(currentPath, folderNode);
         }

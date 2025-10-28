@@ -17,6 +17,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
     excludePattern: ''
   };
   private searchResults: TreeNode[] = [];
+  private treeView?: vscode.TreeView<TreeNode>;
 
   /**
    * ツリーアイテムの表示情報を返す
@@ -143,6 +144,13 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
   }
 
   /**
+   * TreeViewインスタンスを設定
+   */
+  setTreeView(treeView: vscode.TreeView<TreeNode>): void {
+    this.treeView = treeView;
+  }
+
+  /**
    * 検索を実行
    */
   async executeSearch(): Promise<void> {
@@ -152,6 +160,11 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
       const results = await searchFiles(this.searchParams);
       this.searchResults = buildFileTree(results);
       this.refresh();
+      
+      // 検索結果がある場合、すべてのフォルダを展開
+      if (results.length > 0) {
+        await this.expandAllNodes();
+      }
       
       // 結果の通知
       if (results.length === 0) {
@@ -172,6 +185,46 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
     console.log('[SearchTreeProvider] 検索結果をクリア');
     this.searchResults = [];
     this.refresh();
+  }
+
+  /**
+   * すべてのフォルダノードを展開
+   */
+  private async expandAllNodes(): Promise<void> {
+    if (!this.treeView) {
+      return;
+    }
+
+    try {
+      // すべてのフォルダノードを再帰的に収集
+      const folderNodes = this.collectFolderNodes(this.searchResults);
+      
+      // 各フォルダノードを展開
+      for (const folderNode of folderNodes) {
+        await this.treeView.reveal(folderNode, { expand: true });
+      }
+    } catch (error) {
+      console.warn('[SearchTreeProvider] ツリー展開エラー:', error);
+    }
+  }
+
+  /**
+   * フォルダノードを再帰的に収集
+   */
+  private collectFolderNodes(nodes: TreeNode[]): TreeNode[] {
+    const folderNodes: TreeNode[] = [];
+    
+    for (const node of nodes) {
+      if (node.type === 'folder') {
+        folderNodes.push(node);
+        // 子ノードも再帰的に収集
+        if (node.children) {
+          folderNodes.push(...this.collectFolderNodes(node.children));
+        }
+      }
+    }
+    
+    return folderNodes;
   }
 
   /**
