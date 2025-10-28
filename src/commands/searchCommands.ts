@@ -37,6 +37,7 @@ export function registerSearchCommands(
       });
       if (pattern !== undefined) {
         await treeProvider.updateSearchPattern(pattern);
+        await treeProvider.executeSearch(); // 検索を自動実行
       }
     })
   );
