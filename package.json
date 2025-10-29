@@ -73,6 +73,16 @@
       {
         "command": "regexFileFinder.showExamples",
         "title": "正規表現の例を表示"
+      },
+      {
+        "command": "regexFileFinder.expandAll",
+        "title": "すべて展開",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "regexFileFinder.collapseAll",
+        "title": "すべて折りたたむ",
+        "icon": "$(collapse-all)"
       }
     ],
     "configuration": {
@@ -94,6 +104,20 @@
           "description": "検索対象から除外するファイルのパターン（グロブパターン）"
         }
       }
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "regexFileFinder.expandAll",
+          "when": "view == regexFileFinder.searchView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "regexFileFinder.collapseAll",
+          "when": "view == regexFileFinder.searchView",
+          "group": "navigation@2"
+        }
+      ]
     }
   },
   "scripts": {

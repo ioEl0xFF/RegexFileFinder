@@ -10,12 +10,10 @@ export function registerSearchCommands(
   context: vscode.ExtensionContext,
   treeProvider: SearchTreeProvider
 ): void {
-  console.log('[SearchCommands] コマンド登録開始');
   
   // 検索文字列編集
   context.subscriptions.push(
     vscode.commands.registerCommand('regexFileFinder.editSearchPattern', async () => {
-      console.log('[SearchCommands] 検索文字列編集コマンド実行');
       
       const result = await ErrorHandler.handleAsync(async () => {
         const pattern = await vscode.window.showInputBox({
@@ -42,7 +40,6 @@ export function registerSearchCommands(
   // 含めるファイル編集
   context.subscriptions.push(
     vscode.commands.registerCommand('regexFileFinder.editIncludePattern', async () => {
-      console.log('[SearchCommands] 含めるファイル編集コマンド実行');
       
       const result = await ErrorHandler.handleAsync(async () => {
         const pattern = await vscode.window.showInputBox({
@@ -74,7 +71,6 @@ export function registerSearchCommands(
   // 除外するファイル編集
   context.subscriptions.push(
     vscode.commands.registerCommand('regexFileFinder.editExcludePattern', async () => {
-      console.log('[SearchCommands] 除外するファイル編集コマンド実行');
       
       const result = await ErrorHandler.handleAsync(async () => {
         const pattern = await vscode.window.showInputBox({
@@ -106,7 +102,6 @@ export function registerSearchCommands(
   // 検索実行
   context.subscriptions.push(
     vscode.commands.registerCommand('regexFileFinder.executeSearch', async () => {
-      console.log('[SearchCommands] 検索実行コマンド実行');
       
       await ErrorHandler.handleAsync(async () => {
         await treeProvider.executeSearch();
@@ -117,7 +112,6 @@ export function registerSearchCommands(
   // 検索結果クリア
   context.subscriptions.push(
     vscode.commands.registerCommand('regexFileFinder.clearResults', async () => {
-      console.log('[SearchCommands] 検索結果クリアコマンド実行');
       
       await ErrorHandler.handleAsync(async () => {
         treeProvider.clearResults();
@@ -129,7 +123,6 @@ export function registerSearchCommands(
   // 正規表現の例を表示
   context.subscriptions.push(
     vscode.commands.registerCommand('regexFileFinder.showExamples', async () => {
-      console.log('[SearchCommands] 正規表現例表示コマンド実行');
       
       const examples = RegexValidator.generateExamples();
       const exampleText = examples.map((example, index) => 
@@ -141,6 +134,27 @@ export function registerSearchCommands(
       await vscode.window.showInformationMessage(message, { modal: true });
     })
   );
+
+  // すべて展開
+  context.subscriptions.push(
+    vscode.commands.registerCommand('regexFileFinder.expandAll', async () => {
+      
+      await ErrorHandler.handleAsync(async () => {
+        await treeProvider.expandAllNodes();
+        await ErrorHandler.showInfo('すべてのフォルダを展開しました');
+      }, 'SearchCommands.expandAll');
+    })
+  );
+
+  // すべて折りたたむ
+  context.subscriptions.push(
+    vscode.commands.registerCommand('regexFileFinder.collapseAll', async () => {
+      
+      await ErrorHandler.handleAsync(async () => {
+        await treeProvider.collapseAllNodes();
+        await ErrorHandler.showInfo('すべてのフォルダを折りたたみました');
+      }, 'SearchCommands.collapseAll');
+    })
+  );
   
-  console.log('[SearchCommands] コマンド登録完了');
 }
