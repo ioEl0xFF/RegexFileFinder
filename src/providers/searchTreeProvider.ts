@@ -288,10 +288,14 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
     }
 
     try {
+      // モデル側で全フォルダを展開状態に設定
+      this.setAllFolderStates(this._searchResults, vscode.TreeItemCollapsibleState.Expanded);
+      this.refresh();
+
       // すべてのフォルダノードを再帰的に収集
       const folderNodes = this.collectFolderNodes(this._searchResults);
-      
-      // 各フォルダノードを展開
+
+      // UI側も確実に展開（revealで展開を保証）
       for (let i = 0; i < folderNodes.length; i++) {
         if (this._isDisposed) {
           return; // 処理中に破棄された場合は終了
@@ -299,7 +303,12 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
         const folderNode = folderNodes[i];
         await this._treeView.reveal(folderNode, { expand: true });
       }
-      
+
+      if (!this._isDisposed) {
+        // 最終確認（モデル側の展開状態を再設定して同期）
+        this.setAllFolderStates(this._searchResults, vscode.TreeItemCollapsibleState.Expanded);
+        this.refresh();
+      }
 
     } catch (error) {
       // キャンセルエラーは無視（拡張機能終了時の正常な動作）
