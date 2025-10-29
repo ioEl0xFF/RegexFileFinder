@@ -1,14 +1,5 @@
 import { ERROR_MESSAGES, RegexError } from '../services/errorHandler';
-
-/**
- * 正規表現のバリデーション結果
- */
-export interface RegexValidationResult {
-  isValid: boolean;
-  error?: string;
-  warnings?: string[];
-  complexity: 'low' | 'medium' | 'high';
-}
+import { RegexValidationResult } from '../types';
 
 /**
  * 正規表現バリデーター
@@ -56,12 +47,12 @@ export class RegexValidator {
     } catch (error) {
       return {
         isValid: false,
-        error: `${ERROR_MESSAGES.INVALID_REGEX}: ${error instanceof Error ? error.message : '不明なエラー'}`,
+        error: `${ERROR_MESSAGES.INVALID_REGEX}: ${error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR}`,
         complexity: 'low'
       };
     }
 
-    // 危険なパターンチェック（より実用的なアプローチ）
+    // 危険なパターンチェック
     if (this.isDangerousPattern(pattern)) {
       return {
         isValid: false,
@@ -76,22 +67,8 @@ export class RegexValidator {
       warnings.push('正規表現が複雑です。パフォーマンスに影響する可能性があります。');
     }
 
-    // その他の警告（より実用的なアドバイス）
-    if (pattern.includes('.*.*')) {
-      warnings.push('`.*.*` パターンは非効率です。`.*` で十分です。');
-    }
-
-    if (pattern.includes('[^]')) {
-      warnings.push('`[^]` パターンは `[\\s\\S]` の方が明確です。');
-    }
-
-    if (pattern.includes('(.*)*') || pattern.includes('(.*)+')) {
-      warnings.push('`(.*)*` や `(.*)+` パターンは非効率です。より具体的なパターンを使用してください。');
-    }
-
-    if (pattern.length > 200) {
-      warnings.push('正規表現が長いです。分割して複数のパターンに分けることを検討してください。');
-    }
+    // パフォーマンス警告
+    this.addPerformanceWarnings(pattern, warnings);
 
     return {
       isValid: true,
@@ -198,13 +175,34 @@ export class RegexValidator {
   }
 
   /**
+   * パフォーマンス警告を追加
+   */
+  private static addPerformanceWarnings(pattern: string, warnings: string[]): void {
+    if (pattern.includes('.*.*')) {
+      warnings.push('`.*.*` パターンは非効率です。`.*` で十分です。');
+    }
+
+    if (pattern.includes('[^]')) {
+      warnings.push('`[^]` パターンは `[\\s\\S]` の方が明確です。');
+    }
+
+    if (pattern.includes('(.*)*') || pattern.includes('(.*)+')) {
+      warnings.push('`(.*)*` や `(.*)+` パターンは非効率です。より具体的なパターンを使用してください。');
+    }
+
+    if (pattern.length > 200) {
+      warnings.push('正規表現が長いです。分割して複数のパターンに分けることを検討してください。');
+    }
+  }
+
+  /**
    * 正規表現を安全に作成
    */
   static createRegex(pattern: string, flags?: string): RegExp {
     const validation = this.validate(pattern);
     
     if (!validation.isValid) {
-      throw new RegexError(validation.error || '無効な正規表現', pattern);
+      throw new RegexError(validation.error || ERROR_MESSAGES.INVALID_REGEX, pattern);
     }
 
     if (validation.warnings && validation.warnings.length > 0) {

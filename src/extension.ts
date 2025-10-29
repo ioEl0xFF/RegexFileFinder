@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { registerSearchCommands } from './commands/searchCommands';
 import { SearchInputViewProvider } from './providers/searchInputViewProvider';
 import { SearchTreeProvider } from './providers/searchTreeProvider';
-import { ErrorHandler } from './services/errorHandler';
+import { ERROR_MESSAGES, ErrorHandler } from './services/errorHandler';
 
 /**
  * 拡張機能のアクティベーション処理
@@ -44,7 +44,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   } catch (error) {
     console.error('[RegexFileFinder] 初期化エラー:', error);
     ErrorHandler.showError(
-      error instanceof Error ? error : new Error('拡張機能の初期化に失敗しました'),
+      error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
       'Extension.activate'
     );
   }

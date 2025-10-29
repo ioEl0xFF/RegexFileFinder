@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { SearchParams } from '../types';
+import { ConfigError, ERROR_MESSAGES } from './errorHandler';
 
 /**
  * 検索パラメータの設定管理サービス
@@ -48,8 +49,7 @@ export class ConfigService implements vscode.Disposable {
       await config.update('searchPattern', this._searchParams.searchPattern, target);
     } catch (error) {
       console.error('[ConfigService] 設定保存エラー:', error);
-      // 設定保存に失敗してもアプリケーションは継続動作させる
-      // エラーを再スローしない
+      throw new ConfigError(ERROR_MESSAGES.CONFIG_SAVE_ERROR, error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR));
     }
   }
 
@@ -64,7 +64,7 @@ export class ConfigService implements vscode.Disposable {
       };
     } catch (error) {
       console.warn('[ConfigService] 設定読み込みエラー:', error);
-      // デフォルト値を使用
+      // デフォルト値を使用（エラーを再スローしない）
       this._searchParams = {
         searchPattern: ''
       };

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
-import { ErrorHandler } from '../services/errorHandler';
+import { ERROR_MESSAGES, ErrorHandler } from '../services/errorHandler';
 import { RegexValidator } from '../utils/regexValidator';
 import { SearchTreeProvider } from './searchTreeProvider';
 
@@ -53,7 +53,7 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
         }
       } catch (error) {
         await ErrorHandler.showError(
-          error instanceof Error ? error : new Error('入力ビュー処理中にエラーが発生しました'),
+          error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
           'SearchInputViewProvider.onMessage'
         );
       }
@@ -72,7 +72,7 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; connect-src 'none';" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body { 

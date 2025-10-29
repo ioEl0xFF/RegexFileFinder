@@ -30,6 +30,18 @@ export class SearchError extends Error {
   }
 }
 
+/**
+ * 設定関連のエラー
+ */
+export class ConfigError extends Error {
+  public readonly code = 'CONFIG_ERROR';
+
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+    this.name = 'ConfigError';
+  }
+}
+
 
 /**
  * 統一的なエラーハンドリング機能
@@ -60,8 +72,13 @@ export class ErrorHandler {
       userMessage = `正規表現エラー: ${error.message}\n\n入力されたパターン: "${error.pattern}"\n\n例:\n• .*\\.tsx$ - TSXファイル\n• ^test.*\\.js$ - testで始まるJSファイル\n• .*component.* - "component"を含むファイル`;
     } else if (error instanceof SearchError) {
       userMessage = `検索エラー: ${error.message}`;
+    } else if (error instanceof ConfigError) {
+      userMessage = `設定エラー: ${error.message}`;
+    } else if (error.name === 'Canceled') {
+      // キャンセルエラーは表示しない
+      return;
     } else {
-      userMessage = `予期しないエラーが発生しました: ${error.message}`;
+      userMessage = `${ERROR_MESSAGES.UNKNOWN_ERROR}: ${error.message}`;
     }
 
     try {
@@ -164,7 +181,9 @@ export const ERROR_MESSAGES = {
   CONFIG_LOAD_ERROR: '設定の読み込みに失敗しました',
   PATTERN_TOO_COMPLEX: '正規表現パターンが複雑すぎます',
   PATTERN_TOO_LONG: '正規表現パターンが長すぎます（1000文字以内）',
-  DANGEROUS_PATTERN: 'パフォーマンス上の理由で、このパターンは使用できません'
+  DANGEROUS_PATTERN: 'パフォーマンス上の理由で、このパターンは使用できません',
+  UNKNOWN_ERROR: '不明なエラーが発生しました',
+  CANCELLED: '操作がキャンセルされました'
 } as const;
 
 /**
@@ -172,5 +191,6 @@ export const ERROR_MESSAGES = {
  */
 export const ERROR_CODES = {
   REGEX_ERROR: 'REGEX_ERROR',
-  SEARCH_ERROR: 'SEARCH_ERROR'
+  SEARCH_ERROR: 'SEARCH_ERROR',
+  CONFIG_ERROR: 'CONFIG_ERROR'
 } as const;

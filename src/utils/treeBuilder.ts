@@ -36,6 +36,7 @@ export class TreeBuilder {
       return rootNodes;
     } catch (error) {
       console.error('[TreeBuilder] ツリー構築エラー:', error);
+      // エラーが発生しても空の配列を返して処理を継続
       return [];
     }
   }
@@ -82,7 +83,7 @@ export class TreeBuilder {
         
         // 最大深度チェック
         if (options.maxDepth && parts.length > options.maxDepth) {
-          console.warn(`[TreeBuilder] 最大深度を超過: ${relativePath}`);
+          console.warn(`[TreeBuilder] 最大深度を超過: ${relativePath} (深度: ${parts.length}, 最大: ${options.maxDepth})`);
           continue;
         }
         

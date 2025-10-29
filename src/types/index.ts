@@ -82,13 +82,14 @@ export interface SearchResult {
   pattern: string;
 }
 
-
 /**
- * バリデーション結果
+ * 正規表現のバリデーション結果
  */
-export interface ValidationResult {
+export interface RegexValidationResult {
   isValid: boolean;
-  errors: string[];
+  error?: string;
+  warnings?: string[];
+  complexity: 'low' | 'medium' | 'high';
 }
 
 /**
@@ -119,7 +120,6 @@ export interface TreeBuildOptions {
   maxDepth?: number;
 }
 
-
 /**
  * パフォーマンス統計
  */
@@ -129,7 +129,6 @@ export interface PerformanceStats {
   memoryUsage: number;
   batchCount: number;
 }
-
 
 /**
  * 検索の状態

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
-import { ErrorHandler } from '../services/errorHandler';
+import { ERROR_MESSAGES, ErrorHandler } from '../services/errorHandler';
 import { FileSearchService } from '../services/fileSearchService';
 import { FolderNode, SearchState, SearchStateInfo, TreeBuildOptions, TreeNode } from '../types';
 import { TreeBuilder } from '../utils/treeBuilder';
@@ -180,7 +180,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
       this._searchState = 'error';
       this.refresh();
       await ErrorHandler.showError(
-        error instanceof Error ? error : new Error('不明なエラーが発生しました'),
+        error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
         'SearchTreeProvider.executeSearch'
       );
     }

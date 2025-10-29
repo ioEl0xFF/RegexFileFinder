@@ -37,6 +37,7 @@ export class FileSearchService implements vscode.Disposable {
         // キャンセル処理
         token.onCancellationRequested(() => {
           this._currentSearchId = null;
+          console.log('[FileSearchService] 検索がキャンセルされました');
         });
 
         // ワークスペースの存在確認
@@ -77,7 +78,7 @@ export class FileSearchService implements vscode.Disposable {
       } catch (error) {
         const searchError = error instanceof SearchError 
           ? error 
-          : new SearchError(ERROR_MESSAGES.SEARCH_FAILED, error instanceof Error ? error : new Error('不明なエラー'));
+          : new SearchError(ERROR_MESSAGES.SEARCH_FAILED, error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR));
         
         return {
           success: false as const,
@@ -122,7 +123,7 @@ export class FileSearchService implements vscode.Disposable {
     for (let i = 0; i < allFiles.length; i += batchSize) {
       // キャンセルチェック
       if (token.isCancellationRequested || this._currentSearchId !== searchId) {
-        throw new SearchError('検索がキャンセルされました');
+        throw new SearchError(ERROR_MESSAGES.CANCELLED);
       }
 
       const batch = allFiles.slice(i, i + batchSize);
