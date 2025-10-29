@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { registerSearchCommands } from './commands/searchCommands';
+import { SearchInputViewProvider } from './providers/searchInputViewProvider';
 import { SearchTreeProvider } from './providers/searchTreeProvider';
 import { ErrorHandler } from './services/errorHandler';
 
@@ -13,13 +14,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const searchTreeProvider = new SearchTreeProvider();
     
     // TreeViewの登録
-    const treeView = vscode.window.createTreeView('regexFileFinder.searchView', {
+    const treeView = vscode.window.createTreeView('regexFileFinder.searchResults', {
       treeDataProvider: searchTreeProvider
     });
     context.subscriptions.push(treeView);
 
     // TreeViewインスタンスをプロバイダーに設定
     searchTreeProvider.setTreeView(treeView);
+
+    // 入力ビュー（WebviewView）の登録
+    const inputProvider = new SearchInputViewProvider(context, searchTreeProvider);
+    context.subscriptions.push(
+      vscode.window.registerWebviewViewProvider(SearchInputViewProvider.viewId, inputProvider)
+    );
 
     // コマンドの登録
     registerSearchCommands(context, searchTreeProvider);

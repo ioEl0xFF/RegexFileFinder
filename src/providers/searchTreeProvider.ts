@@ -2,12 +2,12 @@ import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
 import { ErrorHandler } from '../services/errorHandler';
 import { FileSearchService } from '../services/fileSearchService';
-import { ActionNode, ConfigNode, FolderNode, SearchState, SearchStateInfo, TreeBuildOptions, TreeNode } from '../types';
+import { FolderNode, SearchState, SearchStateInfo, TreeBuildOptions, TreeNode } from '../types';
 import { TreeBuilder } from '../utils/treeBuilder';
 
 /**
  * 検索TreeDataProvider
- * 検索設定、アクション、検索結果をツリー表示
+ * 検索結果をツリー表示
  */
 export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vscode.Disposable {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<TreeNode | undefined>();
@@ -40,25 +40,6 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
     const treeItem = new vscode.TreeItem(element.label);
     
     switch (element.type) {
-      case 'config':
-        const configNode = element as ConfigNode;
-        treeItem.iconPath = new vscode.ThemeIcon('edit');
-        // configKeyを大文字始まりに変換してコマンドIDを生成
-        const capitalizedKey = configNode.configKey.charAt(0).toUpperCase() + configNode.configKey.slice(1);
-        treeItem.command = {
-          command: `regexFileFinder.edit${capitalizedKey}Pattern`,
-          title: '編集'
-        };
-        break;
-        
-      case 'action':
-        treeItem.iconPath = new vscode.ThemeIcon('search');
-        treeItem.command = {
-          command: 'regexFileFinder.executeSearch',
-          title: '実行'
-        };
-        break;
-        
       case 'folder':
         const folderNode = element as FolderNode;
         treeItem.collapsibleState = folderNode.collapsibleState;
@@ -83,15 +64,8 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
    */
   getChildren(element?: TreeNode): TreeNode[] {
     if (!element) {
-      // ルート: 検索設定 + アクション + 検索結果
-      const configNodes = this.getConfigNodes();
-      const actionNode = this.getActionNode();
-      const children = [
-        ...configNodes,
-        actionNode,
-        ...this._searchResults
-      ];
-      return children;
+      // ルート: 検索結果のみ
+      return this._searchResults;
     }
     
     const children = element.children || [];
@@ -133,68 +107,10 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
   }
 
   /**
-   * 検索設定ノードを取得
-   */
-  private getConfigNodes(): ConfigNode[] {
-    const searchParams = this._configService.searchParams;
-    return [
-      {
-        type: 'config',
-        configKey: 'search',
-        label: `🔍 検索: ${searchParams.searchPattern || '(未設定)'}`,
-        value: searchParams.searchPattern
-      },
-      {
-        type: 'config',
-        configKey: 'include',
-        label: `✅ 含める: ${searchParams.includePattern || '**/*'}`,
-        value: searchParams.includePattern
-      },
-      {
-        type: 'config',
-        configKey: 'exclude',
-        label: `❌ 除外: ${searchParams.excludePattern || '(なし)'}`,
-        value: searchParams.excludePattern
-      }
-    ];
-  }
-
-  /**
-   * アクションノードを取得
-   */
-  private getActionNode(): ActionNode {
-    const label = this._searchState === 'searching' 
-      ? '⏳ 検索中...' 
-      : '🔄 検索を実行';
-    
-    return {
-      type: 'action',
-      actionType: 'execute',
-      label
-    };
-  }
-
-  /**
    * 検索パターンを更新
    */
   async updateSearchPattern(pattern: string): Promise<void> {
     await this._configService.setSearchPattern(pattern);
-    this.refresh();
-  }
-
-  /**
-   * 含めるファイルパターンを更新
-   */
-  async updateIncludePattern(pattern: string): Promise<void> {
-    await this._configService.setIncludePattern(pattern);
-    this.refresh();
-  }
-
-  /**
-   * 除外するファイルパターンを更新
-   */
-  async updateExcludePattern(pattern: string): Promise<void> {
-    await this._configService.setExcludePattern(pattern);
     this.refresh();
   }
 

@@ -105,9 +105,9 @@ export class FileSearchService implements vscode.Disposable {
     const maxResults = options.maxResults || 10000;
     const showProgress = options.showProgress !== false;
 
-    // グロブパターンでファイル取得
-    const includeGlob = params.includePattern || '**/*';
-    const excludeGlob = params.excludePattern || null;
+    // グロブパターンでファイル取得（固定値を使用）
+    const includeGlob = '**/*';
+    const excludeGlob = null; // VS Codeのデフォルト除外設定を使用
     
     const allFiles = await vscode.workspace.findFiles(includeGlob, excludeGlob);
 

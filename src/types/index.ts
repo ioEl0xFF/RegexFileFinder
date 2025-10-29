@@ -36,7 +36,7 @@ export interface TreeNode {
  */
 export interface ConfigNode extends TreeNode {
   type: 'config';
-  configKey: 'search' | 'include' | 'exclude';
+  configKey: 'search';
   value: string;
 }
 
@@ -70,8 +70,6 @@ export interface FileNode extends TreeNode {
  */
 export interface SearchParams {
   searchPattern: string;
-  includePattern: string;
-  excludePattern: string;
 }
 
 /**
@@ -96,7 +94,7 @@ export interface ValidationResult {
 /**
  * 設定の種類
  */
-export type ConfigKey = 'search' | 'include' | 'exclude';
+export type ConfigKey = 'search';
 
 /**
  * アクションの種類

@@ -27,9 +27,7 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onView:regexFileFinder.searchView"
-  ],
+  
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -44,24 +42,17 @@
     "views": {
       "regexFileFinder": [
         {
-          "id": "regexFileFinder.searchView",
-          "name": "ファイル検索"
+          "id": "regexFileFinder.searchInput",
+          "name": "検索条件",
+          "type": "webview"
+        },
+        {
+          "id": "regexFileFinder.searchResults",
+          "name": "検索結果"
         }
       ]
     },
     "commands": [
-      {
-        "command": "regexFileFinder.editSearchPattern",
-        "title": "検索文字列を編集"
-      },
-      {
-        "command": "regexFileFinder.editIncludePattern",
-        "title": "含めるファイルを編集"
-      },
-      {
-        "command": "regexFileFinder.editExcludePattern",
-        "title": "除外するファイルを編集"
-      },
       {
         "command": "regexFileFinder.executeSearch",
         "title": "検索を実行"
@@ -69,10 +60,6 @@
       {
         "command": "regexFileFinder.clearResults",
         "title": "検索結果をクリア"
-      },
-      {
-        "command": "regexFileFinder.showExamples",
-        "title": "正規表現の例を表示"
       },
       {
         "command": "regexFileFinder.expandAll",
@@ -92,16 +79,6 @@
           "type": "string",
           "default": "",
           "description": "デフォルトの検索パターン（正規表現）"
-        },
-        "regexFileFinder.includePattern": {
-          "type": "string",
-          "default": "**/*",
-          "description": "検索対象に含めるファイルのパターン（グロブパターン）"
-        },
-        "regexFileFinder.excludePattern": {
-          "type": "string",
-          "default": "",
-          "description": "検索対象から除外するファイルのパターン（グロブパターン）"
         }
       }
     },
@@ -109,12 +86,12 @@
       "view/title": [
         {
           "command": "regexFileFinder.expandAll",
-          "when": "view == regexFileFinder.searchView",
+          "when": "view == regexFileFinder.searchResults",
           "group": "navigation@1"
         },
         {
           "command": "regexFileFinder.collapseAll",
-          "when": "view == regexFileFinder.searchView",
+          "when": "view == regexFileFinder.searchResults",
           "group": "navigation@2"
         }
       ]

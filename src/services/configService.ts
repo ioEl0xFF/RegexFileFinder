@@ -9,9 +9,7 @@ export class ConfigService implements vscode.Disposable {
   private readonly _configKey = 'regexFileFinder';
   
   private _searchParams: SearchParams = {
-    searchPattern: '',
-    includePattern: '**/*',
-    excludePattern: ''
+    searchPattern: ''
   };
 
   constructor() {
@@ -34,22 +32,6 @@ export class ConfigService implements vscode.Disposable {
     await this.saveConfig();
   }
 
-  /**
-   * 含めるファイルパターンを設定
-   */
-  async setIncludePattern(pattern: string): Promise<void> {
-    this._searchParams.includePattern = pattern || '**/*';
-    await this.saveConfig();
-  }
-
-  /**
-   * 除外するファイルパターンを設定
-   */
-  async setExcludePattern(pattern: string): Promise<void> {
-    this._searchParams.excludePattern = pattern;
-    await this.saveConfig();
-  }
-
 
   /**
    * 設定を保存
@@ -64,8 +46,6 @@ export class ConfigService implements vscode.Disposable {
         : vscode.ConfigurationTarget.Global;
       
       await config.update('searchPattern', this._searchParams.searchPattern, target);
-      await config.update('includePattern', this._searchParams.includePattern, target);
-      await config.update('excludePattern', this._searchParams.excludePattern, target);
     } catch (error) {
       console.error('[ConfigService] 設定保存エラー:', error);
       // 設定保存に失敗してもアプリケーションは継続動作させる
@@ -80,17 +60,13 @@ export class ConfigService implements vscode.Disposable {
     try {
       const config = vscode.workspace.getConfiguration(this._configKey);
       this._searchParams = {
-        searchPattern: config.get('searchPattern', ''),
-        includePattern: config.get('includePattern', '**/*'),
-        excludePattern: config.get('excludePattern', '')
+        searchPattern: config.get('searchPattern', '')
       };
     } catch (error) {
       console.warn('[ConfigService] 設定読み込みエラー:', error);
       // デフォルト値を使用
       this._searchParams = {
-        searchPattern: '',
-        includePattern: '**/*',
-        excludePattern: ''
+        searchPattern: ''
       };
     }
   }
