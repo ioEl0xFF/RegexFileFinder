@@ -1,23 +1,36 @@
 import * as vscode from 'vscode';
-import { searchFiles } from '../services/fileSearchService';
-import { ActionNode, ConfigNode, FolderNode, SearchParams, TreeNode } from '../types';
-import { buildFileTree } from '../utils/treeBuilder';
+import { ConfigService } from '../services/configService';
+import { ErrorHandler } from '../services/errorHandler';
+import { FileSearchService } from '../services/fileSearchService';
+import { ActionNode, ConfigNode, FolderNode, SearchState, SearchStateInfo, TreeBuildOptions, TreeNode } from '../types';
+import { TreeBuilder } from '../utils/treeBuilder';
 
 /**
  * 検索TreeDataProvider
  * 検索設定、アクション、検索結果をツリー表示
  */
-export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
-  private _onDidChangeTreeData = new vscode.EventEmitter<TreeNode | undefined>();
+export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vscode.Disposable {
+  private readonly _onDidChangeTreeData = new vscode.EventEmitter<TreeNode | undefined>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-  private searchParams: SearchParams = {
-    searchPattern: '',
-    includePattern: '',
-    excludePattern: ''
-  };
-  private searchResults: TreeNode[] = [];
-  private treeView?: vscode.TreeView<TreeNode>;
+  private readonly _disposables: vscode.Disposable[] = [];
+  private readonly _configService: ConfigService;
+  private readonly _fileSearchService: FileSearchService;
+  
+  private _searchResults: TreeNode[] = [];
+  private _treeView?: vscode.TreeView<TreeNode>;
+  private _searchState: SearchState = 'idle';
+  private _lastSearchTime = 0;
+
+  constructor() {
+    this._configService = new ConfigService();
+    this._fileSearchService = new FileSearchService();
+    
+    // 設定変更の監視
+    this._disposables.push(
+      this._configService
+    );
+  }
 
   /**
    * ツリーアイテムの表示情報を返す
@@ -73,7 +86,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
       return [
         ...this.getConfigNodes(),
         this.getActionNode(),
-        ...this.searchResults
+        ...this._searchResults
       ];
     }
     return element.children || [];
@@ -89,7 +102,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
     }
 
     // 検索結果から親を検索
-    return this.findParentInNodes(this.searchResults, element);
+    return this.findParentInNodes(this._searchResults, element);
   }
 
   /**
@@ -116,24 +129,25 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
    * 検索設定ノードを取得
    */
   private getConfigNodes(): ConfigNode[] {
+    const searchParams = this._configService.searchParams;
     return [
       {
         type: 'config',
         configKey: 'search',
-        label: `🔍 検索: ${this.searchParams.searchPattern || '(未設定)'}`,
-        value: this.searchParams.searchPattern
+        label: `🔍 検索: ${searchParams.searchPattern || '(未設定)'}`,
+        value: searchParams.searchPattern
       },
       {
         type: 'config',
         configKey: 'include',
-        label: `✅ 含める: ${this.searchParams.includePattern || '**/*'}`,
-        value: this.searchParams.includePattern
+        label: `✅ 含める: ${searchParams.includePattern || '**/*'}`,
+        value: searchParams.includePattern
       },
       {
         type: 'config',
         configKey: 'exclude',
-        label: `❌ 除外: ${this.searchParams.excludePattern || '(なし)'}`,
-        value: this.searchParams.excludePattern
+        label: `❌ 除外: ${searchParams.excludePattern || '(なし)'}`,
+        value: searchParams.excludePattern
       }
     ];
   }
@@ -142,10 +156,14 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
    * アクションノードを取得
    */
   private getActionNode(): ActionNode {
+    const label = this._searchState === 'searching' 
+      ? '⏳ 検索中...' 
+      : '🔄 検索を実行';
+    
     return {
       type: 'action',
       actionType: 'execute',
-      label: '🔄 検索を実行'
+      label
     };
   }
 
@@ -154,7 +172,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
    */
   async updateSearchPattern(pattern: string): Promise<void> {
     console.log('[SearchTreeProvider] 検索パターン更新:', pattern);
-    this.searchParams.searchPattern = pattern;
+    await this._configService.setSearchPattern(pattern);
     this.refresh();
   }
 
@@ -163,7 +181,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
    */
   async updateIncludePattern(pattern: string): Promise<void> {
     console.log('[SearchTreeProvider] 含めるパターン更新:', pattern);
-    this.searchParams.includePattern = pattern;
+    await this._configService.setIncludePattern(pattern);
     this.refresh();
   }
 
@@ -172,7 +190,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
    */
   async updateExcludePattern(pattern: string): Promise<void> {
     console.log('[SearchTreeProvider] 除外パターン更新:', pattern);
-    this.searchParams.excludePattern = pattern;
+    await this._configService.setExcludePattern(pattern);
     this.refresh();
   }
 
@@ -180,7 +198,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
    * TreeViewインスタンスを設定
    */
   setTreeView(treeView: vscode.TreeView<TreeNode>): void {
-    this.treeView = treeView;
+    this._treeView = treeView;
   }
 
   /**
@@ -189,25 +207,58 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
   async executeSearch(): Promise<void> {
     console.log('[SearchTreeProvider] 検索実行');
     
+    if (this._searchState === 'searching') {
+      console.log('[SearchTreeProvider] 既に検索中です');
+      return;
+    }
+
+    this._searchState = 'searching';
+    this.refresh();
+    
     try {
-      const results = await searchFiles(this.searchParams);
-      this.searchResults = buildFileTree(results);
-      this.refresh();
-      
-      // 検索結果がある場合、すべてのフォルダを展開
-      if (results.length > 0) {
-        await this.expandAllNodes();
-      }
-      
-      // 結果の通知
-      if (results.length === 0) {
-        vscode.window.showInformationMessage('該当するファイルが見つかりませんでした（0件）');
+      const searchParams = this._configService.searchParams;
+      const result = await this._fileSearchService.searchFiles(searchParams, {
+        batchSize: 100,
+        maxResults: 10000,
+        showProgress: true
+      });
+
+      if (result.success) {
+        const treeOptions: TreeBuildOptions = {
+          sortFoldersFirst: true,
+          expandAll: true,
+          maxDepth: 20
+        };
+        
+        this._searchResults = TreeBuilder.buildFileTree(result.data.files, treeOptions);
+        this._lastSearchTime = result.data.searchTime;
+        this._searchState = 'completed';
+        
+        this.refresh();
+        
+        // 検索結果がある場合、すべてのフォルダを展開
+        if (result.data.files.length > 0) {
+          await this.expandAllNodes();
+        }
+        
+        // 結果の通知
+        const message = result.data.files.length === 0 
+          ? '該当するファイルが見つかりませんでした（0件）'
+          : `${result.data.files.length}件のファイルが見つかりました（${result.data.searchTime}ms）`;
+        
+        await ErrorHandler.showInfo(message);
       } else {
-        vscode.window.showInformationMessage(`${results.length}件のファイルが見つかりました`);
+        this._searchState = 'error';
+        this.refresh();
+        await ErrorHandler.showError(result.error, 'SearchTreeProvider.executeSearch');
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '不明なエラーが発生しました';
-      vscode.window.showErrorMessage(`検索エラー: ${errorMessage}`);
+      this._searchState = 'error';
+      this.refresh();
+      await ErrorHandler.showError(
+        error instanceof Error ? error : new Error('不明なエラーが発生しました'),
+        'SearchTreeProvider.executeSearch'
+      );
     }
   }
 
@@ -216,7 +267,8 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
    */
   clearResults(): void {
     console.log('[SearchTreeProvider] 検索結果をクリア');
-    this.searchResults = [];
+    this._searchResults = [];
+    this._searchState = 'idle';
     this.refresh();
   }
 
@@ -224,17 +276,17 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
    * すべてのフォルダノードを展開
    */
   private async expandAllNodes(): Promise<void> {
-    if (!this.treeView) {
+    if (!this._treeView) {
       return;
     }
 
     try {
       // すべてのフォルダノードを再帰的に収集
-      const folderNodes = this.collectFolderNodes(this.searchResults);
+      const folderNodes = this.collectFolderNodes(this._searchResults);
       
       // 各フォルダノードを展開
       for (const folderNode of folderNodes) {
-        await this.treeView.reveal(folderNode, { expand: true });
+        await this._treeView.reveal(folderNode, { expand: true });
       }
     } catch (error) {
       console.warn('[SearchTreeProvider] ツリー展開エラー:', error);
@@ -261,9 +313,36 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
   }
 
   /**
+   * 検索状態を取得
+   */
+  getSearchState(): SearchStateInfo {
+    return {
+      state: this._searchState,
+      results: this._searchState === 'completed' ? {
+        files: this._searchResults
+          .filter(node => node.type === 'file')
+          .map(node => (node as any).resourceUri)
+          .filter(Boolean),
+        totalCount: this._searchResults.length,
+        searchTime: this._lastSearchTime,
+        pattern: this._configService.searchParams.searchPattern
+      } : undefined
+    };
+  }
+
+  /**
    * ツリービューを再描画
    */
   refresh(): void {
     this._onDidChangeTreeData.fire(undefined);
+  }
+
+  /**
+   * リソースをクリーンアップ
+   */
+  dispose(): void {
+    this._disposables.forEach(disposable => disposable.dispose());
+    this._disposables.length = 0;
+    this._fileSearchService.dispose();
   }
 }
