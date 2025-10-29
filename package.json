@@ -69,8 +69,32 @@
       {
         "command": "regexFileFinder.clearResults",
         "title": "検索結果をクリア"
+      },
+      {
+        "command": "regexFileFinder.showExamples",
+        "title": "正規表現の例を表示"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Regex File Finder",
+      "properties": {
+        "regexFileFinder.searchPattern": {
+          "type": "string",
+          "default": "",
+          "description": "デフォルトの検索パターン（正規表現）"
+        },
+        "regexFileFinder.includePattern": {
+          "type": "string",
+          "default": "**/*",
+          "description": "検索対象に含めるファイルのパターン（グロブパターン）"
+        },
+        "regexFileFinder.excludePattern": {
+          "type": "string",
+          "default": "",
+          "description": "検索対象から除外するファイルのパターン（グロブパターン）"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
