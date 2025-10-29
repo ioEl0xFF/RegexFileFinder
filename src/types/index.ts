@@ -84,14 +84,6 @@ export interface SearchResult {
   pattern: string;
 }
 
-/**
- * 進捗情報
- */
-export interface ProgressInfo {
-  current: number;
-  total: number;
-  message: string;
-}
 
 /**
  * バリデーション結果
@@ -118,7 +110,6 @@ export interface SearchOptions {
   batchSize?: number;
   maxResults?: number;
   showProgress?: boolean;
-  caseSensitive?: boolean;
 }
 
 /**
@@ -130,29 +121,6 @@ export interface TreeBuildOptions {
   maxDepth?: number;
 }
 
-/**
- * エラーの種類
- */
-export type ErrorType = 'validation' | 'search' | 'config' | 'regex' | 'unknown';
-
-/**
- * ログレベル
- */
-export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
-
-/**
- * イベントの種類
- */
-export type EventType = 'searchStarted' | 'searchCompleted' | 'searchFailed' | 'configChanged' | 'resultsCleared';
-
-/**
- * イベントデータ
- */
-export interface EventData {
-  type: EventType;
-  timestamp: number;
-  data?: any;
-}
 
 /**
  * パフォーマンス統計
@@ -164,14 +132,6 @@ export interface PerformanceStats {
   batchCount: number;
 }
 
-/**
- * 設定の変更イベント
- */
-export interface ConfigChangeEvent {
-  key: ConfigKey;
-  oldValue: string;
-  newValue: string;
-}
 
 /**
  * 検索の状態
@@ -183,23 +143,7 @@ export type SearchState = 'idle' | 'searching' | 'completed' | 'error';
  */
 export interface SearchStateInfo {
   state: SearchState;
-  progress?: ProgressInfo;
   error?: string;
   results?: SearchResult;
 }
 
-/**
- * ユーティリティ型
- */
-export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-export type Required<T, K extends keyof T> = T & { [P in K]-?: T[P] };
-export type NonNullable<T> = T extends null | undefined ? never : T;
-
-/**
- * 関数の型定義
- */
-export type AsyncFunction<T, R> = (arg: T) => Promise<R>;
-export type SyncFunction<T, R> = (arg: T) => R;
-export type EventHandler<T> = (data: T) => void | Promise<void>;
-export type Validator<T> = (value: T) => ValidationResult;
-export type Transformer<T, R> = (value: T) => R;

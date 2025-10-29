@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { FileNode, FolderNode, PerformanceStats, TreeBuildOptions, TreeNode } from '../types';
+import { FileNode, FolderNode, TreeBuildOptions, TreeNode } from '../types';
 
 /**
  * ツリービルダークラス
@@ -18,11 +18,9 @@ export class TreeBuilder {
     options: TreeBuildOptions = {}
   ): TreeNode[] {
     const startTime = Date.now();
-    console.log('[TreeBuilder] ツリー構築開始:', files.length, 'ファイル');
     
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceRoot || files.length === 0) {
-      console.log('[TreeBuilder] ワークスペースルートが無いか、ファイルが0件');
       return [];
     }
 
@@ -34,7 +32,6 @@ export class TreeBuilder {
       const rootNodes = this.buildHierarchy(nodeMap, workspaceRoot, options);
       
       const buildTime = Date.now() - startTime;
-      console.log(`[TreeBuilder] ツリー構築完了: ${rootNodes.length}ルートノード (${buildTime}ms)`);
       
       return rootNodes;
     } catch (error) {
@@ -128,7 +125,7 @@ export class TreeBuilder {
             type: 'folder',
             label: part,
             children: [],
-            collapsibleState: vscode.TreeItemCollapsibleState.Expanded
+            collapsibleState: vscode.TreeItemCollapsibleState.Collapsed
           };
           nodeMap.set(currentPath, folderNode);
         }
@@ -201,62 +198,5 @@ export class TreeBuilder {
     }
   }
 
-  /**
-   * ツリーの統計情報を取得
-   */
-  static getTreeStats(nodes: TreeNode[]): PerformanceStats {
-    let fileCount = 0;
-    let folderCount = 0;
-    let maxDepth = 0;
-
-    const countNodes = (nodeList: TreeNode[], depth: number = 0): void => {
-      maxDepth = Math.max(maxDepth, depth);
-      
-      for (const node of nodeList) {
-        if (node.type === 'file') {
-          fileCount++;
-        } else if (node.type === 'folder') {
-          folderCount++;
-          if (node.children && node.children.length > 0) {
-            countNodes(node.children, depth + 1);
-          }
-        }
-      }
-    };
-
-    countNodes(nodes);
-
-    return {
-      searchTime: 0, // ツリー構築時間は別途管理
-      fileCount,
-      memoryUsage: process.memoryUsage().heapUsed,
-      batchCount: Math.ceil((fileCount + folderCount) / this.DEFAULT_BATCH_SIZE)
-    };
-  }
-
-  /**
-   * ツリーを最適化（不要な空フォルダを削除など）
-   */
-  static optimizeTree(nodes: TreeNode[]): TreeNode[] {
-    return nodes.filter(node => {
-      if (node.type === 'folder') {
-        const folderNode = node as FolderNode;
-        if (folderNode.children && folderNode.children.length > 0) {
-          // 子ノードも再帰的に最適化
-          folderNode.children = this.optimizeTree(folderNode.children);
-          return folderNode.children.length > 0;
-        }
-        return false; // 空のフォルダは削除
-      }
-      return true; // ファイルは保持
-    });
-  }
 }
 
-/**
- * 後方互換性のための関数（非推奨）
- * @deprecated TreeBuilder.buildFileTree()を使用してください
- */
-export function buildFileTree(files: vscode.Uri[]): TreeNode[] {
-  return TreeBuilder.buildFileTree(files);
-}

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { SearchParams } from '../types';
 
 /**
  * 検索パラメータの設定管理サービス
@@ -49,17 +50,6 @@ export class ConfigService implements vscode.Disposable {
     await this.saveConfig();
   }
 
-  /**
-   * 設定をリセット
-   */
-  async resetConfig(): Promise<void> {
-    this._searchParams = {
-      searchPattern: '',
-      includePattern: '**/*',
-      excludePattern: ''
-    };
-    await this.saveConfig();
-  }
 
   /**
    * 設定を保存
@@ -94,7 +84,6 @@ export class ConfigService implements vscode.Disposable {
         includePattern: config.get('includePattern', '**/*'),
         excludePattern: config.get('excludePattern', '')
       };
-      console.log('[ConfigService] 設定読み込み完了:', this._searchParams);
     } catch (error) {
       console.warn('[ConfigService] 設定読み込みエラー:', error);
       // デフォルト値を使用
@@ -118,40 +107,6 @@ export class ConfigService implements vscode.Disposable {
     this._disposables.push(disposable);
   }
 
-  /**
-   * デフォルト設定を取得
-   */
-  static getDefaultConfig(): SearchParams {
-    return {
-      searchPattern: '',
-      includePattern: '**/*',
-      excludePattern: ''
-    };
-  }
-
-  /**
-   * 設定の妥当性を検証
-   */
-  validateConfig(params: Partial<SearchParams>): ValidationResult {
-    const errors: string[] = [];
-
-    if (params.searchPattern !== undefined) {
-      if (params.searchPattern.trim() === '') {
-        errors.push('検索パターンは必須です');
-      }
-    }
-
-    if (params.includePattern !== undefined) {
-      if (params.includePattern.trim() === '') {
-        errors.push('含めるファイルパターンは必須です');
-      }
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
-  }
 
   /**
    * リソースをクリーンアップ
@@ -162,30 +117,4 @@ export class ConfigService implements vscode.Disposable {
   }
 }
 
-/**
- * 検索パラメータの型定義
- */
-export interface SearchParams {
-  searchPattern: string;
-  includePattern: string;
-  excludePattern: string;
-}
 
-/**
- * バリデーション結果の型定義
- */
-export interface ValidationResult {
-  isValid: boolean;
-  errors: string[];
-}
-
-/**
- * 設定のデフォルト値
- */
-export const DEFAULT_CONFIG = {
-  SEARCH_PATTERN: '',
-  INCLUDE_PATTERN: '**/*',
-  EXCLUDE_PATTERN: '',
-  MAX_PATTERN_LENGTH: 1000,
-  BATCH_SIZE: 100
-} as const;

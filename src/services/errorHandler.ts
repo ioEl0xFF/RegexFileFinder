@@ -30,31 +30,6 @@ export class SearchError extends Error {
   }
 }
 
-/**
- * バリデーション関連のエラー
- */
-export class ValidationError extends Error {
-  public readonly field: string;
-  public readonly code = 'VALIDATION_ERROR';
-
-  constructor(message: string, field: string) {
-    super(message);
-    this.name = 'ValidationError';
-    this.field = field;
-  }
-}
-
-/**
- * 設定関連のエラー
- */
-export class ConfigError extends Error {
-  public readonly code = 'CONFIG_ERROR';
-
-  constructor(message: string, public readonly configKey?: string) {
-    super(message);
-    this.name = 'ConfigError';
-  }
-}
 
 /**
  * 統一的なエラーハンドリング機能
@@ -69,9 +44,7 @@ export class ErrorHandler {
       name: error.name,
       message: error.message,
       stack: error.stack,
-      ...(error instanceof RegexError && { pattern: error.pattern }),
-      ...(error instanceof ValidationError && { field: error.field }),
-      ...(error instanceof ConfigError && { configKey: error.configKey })
+      ...(error instanceof RegexError && { pattern: error.pattern })
     });
   }
 
@@ -85,33 +58,50 @@ export class ErrorHandler {
     
     if (error instanceof RegexError) {
       userMessage = `正規表現エラー: ${error.message}\n\n入力されたパターン: "${error.pattern}"\n\n例:\n• .*\\.tsx$ - TSXファイル\n• ^test.*\\.js$ - testで始まるJSファイル\n• .*component.* - "component"を含むファイル`;
-    } else if (error instanceof ValidationError) {
-      userMessage = `入力エラー: ${error.message}`;
     } else if (error instanceof SearchError) {
       userMessage = `検索エラー: ${error.message}`;
-    } else if (error instanceof ConfigError) {
-      userMessage = `設定エラー: ${error.message}`;
     } else {
       userMessage = `予期しないエラーが発生しました: ${error.message}`;
     }
 
-    await vscode.window.showErrorMessage(userMessage);
+    try {
+      await vscode.window.showErrorMessage(userMessage);
+    } catch (displayError) {
+      // キャンセルエラーは無視（拡張機能終了時の正常な動作）
+      if (displayError instanceof Error && displayError.name !== 'Canceled') {
+        console.error('[ErrorHandler] エラー表示エラー:', displayError);
+      }
+    }
   }
 
   /**
    * 警告メッセージをユーザーに表示
    */
   static async showWarning(message: string): Promise<void> {
-    console.warn(`警告: ${message}`);
-    await vscode.window.showWarningMessage(message);
+    try {
+      console.warn(`警告: ${message}`);
+      await vscode.window.showWarningMessage(message);
+    } catch (error) {
+      // キャンセルエラーは無視（拡張機能終了時の正常な動作）
+      if (error instanceof Error && error.name !== 'Canceled') {
+        console.error('[ErrorHandler] 警告表示エラー:', error);
+      }
+    }
   }
 
   /**
    * 情報メッセージをユーザーに表示
    */
   static async showInfo(message: string): Promise<void> {
-    console.info(`情報: ${message}`);
-    await vscode.window.showInformationMessage(message);
+    try {
+      console.info(`情報: ${message}`);
+      await vscode.window.showInformationMessage(message);
+    } catch (error) {
+      // キャンセルエラーは無視（拡張機能終了時の正常な動作）
+      if (error instanceof Error && error.name !== 'Canceled') {
+        console.error('[ErrorHandler] 情報表示エラー:', error);
+      }
+    }
   }
 
   /**
@@ -125,6 +115,11 @@ export class ErrorHandler {
     try {
       return await operation();
     } catch (error) {
+      // キャンセルエラーは無視（拡張機能終了時の正常な動作）
+      if (error instanceof Error && error.name === 'Canceled') {
+        return fallback;
+      }
+      
       if (error instanceof Error) {
         await this.showError(error, context);
       } else {
@@ -177,7 +172,5 @@ export const ERROR_MESSAGES = {
  */
 export const ERROR_CODES = {
   REGEX_ERROR: 'REGEX_ERROR',
-  SEARCH_ERROR: 'SEARCH_ERROR',
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-  CONFIG_ERROR: 'CONFIG_ERROR'
+  SEARCH_ERROR: 'SEARCH_ERROR'
 } as const;
