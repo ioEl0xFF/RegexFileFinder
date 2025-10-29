@@ -214,28 +214,6 @@ export class RegexValidator {
     return new RegExp(pattern, flags);
   }
 
-  /**
-   * パターンがファイル名検索に適しているかチェック
-   */
-  static isSuitableForFileName(pattern: string): boolean {
-    const validation = this.validate(pattern);
-    
-    if (!validation.isValid) {
-      return false;
-    }
-
-    // ファイル名検索に不適切なパターンをチェック
-    const unsuitablePatterns = [
-      /\\n/, // 改行文字
-      /\\r/, // キャリッジリターン
-      /\\t/, // タブ文字
-      /\\s/, // 空白文字（ファイル名には通常含まれない）
-      /^/,   // 行の開始
-      /$/,   // 行の終了
-    ];
-
-    return !unsuitablePatterns.some(p => p.test(pattern));
-  }
 
   /**
    * パターンの例を生成

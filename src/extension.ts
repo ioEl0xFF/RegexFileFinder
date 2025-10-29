@@ -7,7 +7,6 @@ import { ErrorHandler } from './services/errorHandler';
  * 拡張機能のアクティベーション処理
  */
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  console.log('[RegexFileFinder] 拡張機能がアクティベートされました');
 
   try {
     // 検索TreeProviderの初期化
@@ -18,7 +17,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       treeDataProvider: searchTreeProvider
     });
     context.subscriptions.push(treeView);
-    console.log('[RegexFileFinder] TreeView登録完了');
 
     // TreeViewインスタンスをプロバイダーに設定
     searchTreeProvider.setTreeView(treeView);
@@ -36,8 +34,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       console.warn('[RegexFileFinder] 初期化時の自動検索エラー:', error);
       // エラーが発生しても拡張機能の初期化は継続
     }
-
-    console.log('[RegexFileFinder] 初期化完了');
   } catch (error) {
     console.error('[RegexFileFinder] 初期化エラー:', error);
     ErrorHandler.showError(
@@ -51,12 +47,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
  * 拡張機能の非アクティベーション処理
  */
 export function deactivate(): void {
-  console.log('[RegexFileFinder] 拡張機能が非アクティベートされました');
   
   try {
     // リソースのクリーンアップは context.subscriptions で自動的に実行される
-    console.log('[RegexFileFinder] クリーンアップ完了');
+    // 進行中の非同期処理は自動的にキャンセルされる
   } catch (error) {
-    console.error('[RegexFileFinder] クリーンアップエラー:', error);
+    // キャンセルエラーは無視（拡張機能終了時の正常な動作）
+    if (error instanceof Error && error.name !== 'Canceled') {
+      console.error('[RegexFileFinder] クリーンアップエラー:', error);
+    }
   }
 }
