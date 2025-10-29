@@ -80,6 +80,39 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
   }
 
   /**
+   * 親要素を取得（revealメソッド使用のために必要）
+   */
+  getParent(element: TreeNode): TreeNode | undefined {
+    // ルート要素の場合はundefinedを返す
+    if (!element) {
+      return undefined;
+    }
+
+    // 検索結果から親を検索
+    return this.findParentInNodes(this.searchResults, element);
+  }
+
+  /**
+   * ノードリストから指定された要素の親を検索
+   */
+  private findParentInNodes(nodes: TreeNode[], target: TreeNode): TreeNode | undefined {
+    for (const node of nodes) {
+      if (node.children) {
+        // 直接の子かチェック
+        if (node.children.includes(target)) {
+          return node;
+        }
+        // 再帰的に子ノードを検索
+        const found = this.findParentInNodes(node.children, target);
+        if (found) {
+          return found;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * 検索設定ノードを取得
    */
   private getConfigNodes(): ConfigNode[] {
