@@ -36,6 +36,8 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
    * ツリーアイテムの表示情報を返す
    */
   getTreeItem(element: TreeNode): vscode.TreeItem {
+    console.log(`[SearchTreeProvider] getTreeItem呼び出し: type=${element.type}, label="${element.label}"`);
+    
     const treeItem = new vscode.TreeItem(element.label);
     
     switch (element.type) {
@@ -48,6 +50,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
           command: `regexFileFinder.edit${capitalizedKey}Pattern`,
           title: '編集'
         };
+        console.log(`[SearchTreeProvider] 設定ノード作成: ${configNode.configKey} = "${configNode.value}"`);
         break;
         
       case 'action':
@@ -56,12 +59,16 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
           command: 'regexFileFinder.executeSearch',
           title: '実行'
         };
+        console.log(`[SearchTreeProvider] アクションノード作成: ${element.label}`);
         break;
         
       case 'folder':
         const folderNode = element as FolderNode;
         treeItem.collapsibleState = folderNode.collapsibleState;
         treeItem.iconPath = vscode.ThemeIcon.Folder;
+        const stateText = folderNode.collapsibleState === vscode.TreeItemCollapsibleState.Expanded ? '展開' : 
+                         folderNode.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed ? '折りたたみ' : 'なし';
+        console.log(`[SearchTreeProvider] フォルダノード作成: "${element.label}" (状態: ${stateText}, 子要素数: ${folderNode.children?.length || 0})`);
         break;
         
       case 'file':
@@ -71,6 +78,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
           title: 'ファイルを開く',
           arguments: [element.resourceUri]
         };
+        console.log(`[SearchTreeProvider] ファイルノード作成: "${element.label}" (URI: ${element.resourceUri?.fsPath})`);
         break;
     }
     
@@ -83,13 +91,20 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
   getChildren(element?: TreeNode): TreeNode[] {
     if (!element) {
       // ルート: 検索設定 + アクション + 検索結果
-      return [
-        ...this.getConfigNodes(),
-        this.getActionNode(),
+      const configNodes = this.getConfigNodes();
+      const actionNode = this.getActionNode();
+      const children = [
+        ...configNodes,
+        actionNode,
         ...this._searchResults
       ];
+      console.log(`[SearchTreeProvider] getChildren(ルート): ${children.length}個の子要素を返す (設定:${configNodes.length}, アクション:1, 検索結果:${this._searchResults.length})`);
+      return children;
     }
-    return element.children || [];
+    
+    const children = element.children || [];
+    console.log(`[SearchTreeProvider] getChildren("${element.label}"): ${children.length}個の子要素を返す`);
+    return children;
   }
 
   /**
@@ -98,11 +113,14 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
   getParent(element: TreeNode): TreeNode | undefined {
     // ルート要素の場合はundefinedを返す
     if (!element) {
+      console.log('[SearchTreeProvider] getParent: ルート要素のため親なし');
       return undefined;
     }
 
     // 検索結果から親を検索
-    return this.findParentInNodes(this._searchResults, element);
+    const parent = this.findParentInNodes(this._searchResults, element);
+    console.log(`[SearchTreeProvider] getParent("${element.label}"): ${parent ? `親が見つかりました: "${parent.label}"` : '親が見つかりませんでした'}`);
+    return parent;
   }
 
   /**
@@ -277,17 +295,25 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
    */
   private async expandAllNodes(): Promise<void> {
     if (!this._treeView) {
+      console.log('[SearchTreeProvider] expandAllNodes: TreeViewが設定されていないためスキップ');
       return;
     }
 
     try {
+      console.log('[SearchTreeProvider] expandAllNodes: フォルダノードの展開を開始');
+      
       // すべてのフォルダノードを再帰的に収集
       const folderNodes = this.collectFolderNodes(this._searchResults);
+      console.log(`[SearchTreeProvider] expandAllNodes: ${folderNodes.length}個のフォルダノードを収集`);
       
       // 各フォルダノードを展開
-      for (const folderNode of folderNodes) {
+      for (let i = 0; i < folderNodes.length; i++) {
+        const folderNode = folderNodes[i];
+        console.log(`[SearchTreeProvider] expandAllNodes: フォルダを展開中 (${i + 1}/${folderNodes.length}): "${folderNode.label}"`);
         await this._treeView.reveal(folderNode, { expand: true });
       }
+      
+      console.log('[SearchTreeProvider] expandAllNodes: すべてのフォルダノードの展開が完了');
     } catch (error) {
       console.warn('[SearchTreeProvider] ツリー展開エラー:', error);
     }
@@ -302,9 +328,13 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
     for (const node of nodes) {
       if (node.type === 'folder') {
         folderNodes.push(node);
+        console.log(`[SearchTreeProvider] collectFolderNodes: フォルダノードを収集: "${node.label}"`);
+        
         // 子ノードも再帰的に収集
         if (node.children) {
-          folderNodes.push(...this.collectFolderNodes(node.children));
+          const childFolders = this.collectFolderNodes(node.children);
+          folderNodes.push(...childFolders);
+          console.log(`[SearchTreeProvider] collectFolderNodes: "${node.label}"の子フォルダ${childFolders.length}個を収集`);
         }
       }
     }
@@ -334,7 +364,27 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
    * ツリービューを再描画
    */
   refresh(): void {
+    console.log('[SearchTreeProvider] refresh: ツリービューを再描画');
     this._onDidChangeTreeData.fire(undefined);
+  }
+
+  /**
+   * 設定値が存在する場合に検索を実行（初期化時用）
+   */
+  async executeSearchIfConfigured(): Promise<void> {
+    console.log('[SearchTreeProvider] 初期化時の自動検索チェック');
+    
+    try {
+      const searchParams = this._configService.searchParams;
+      console.log('[SearchTreeProvider] 検索パターン:', searchParams.searchPattern);
+      
+      // 常に検索を実行
+      console.log('[SearchTreeProvider] 初期化時の自動検索を実行');
+      await this.executeSearch();
+    } catch (error) {
+      console.warn('[SearchTreeProvider] 初期化時の自動検索でエラー:', error);
+      // エラーが発生しても初期化処理は継続
+    }
   }
 
   /**

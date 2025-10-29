@@ -6,7 +6,7 @@ import { ErrorHandler } from './services/errorHandler';
 /**
  * 拡張機能のアクティベーション処理
  */
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   console.log('[RegexFileFinder] 拡張機能がアクティベートされました');
 
   try {
@@ -28,6 +28,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
     // プロバイダーをコンテキストに追加（クリーンアップ用）
     context.subscriptions.push(searchTreeProvider);
+
+    // 初期化時の自動検索実行
+    try {
+      await searchTreeProvider.executeSearchIfConfigured();
+    } catch (error) {
+      console.warn('[RegexFileFinder] 初期化時の自動検索エラー:', error);
+      // エラーが発生しても拡張機能の初期化は継続
+    }
 
     console.log('[RegexFileFinder] 初期化完了');
   } catch (error) {
