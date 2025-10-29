@@ -1,9 +1,28 @@
 import * as vscode from 'vscode';
 
-// ツリーノードの種類
+/**
+ * Result型パターン - 成功/失敗を型安全に表現
+ */
+export type Result<T, E = Error> = Success<T> | Failure<E>;
+
+export interface Success<T> {
+  success: true;
+  data: T;
+}
+
+export interface Failure<E> {
+  success: false;
+  error: E;
+}
+
+/**
+ * ツリーノードの種類
+ */
 export type TreeNodeType = 'config' | 'action' | 'folder' | 'file';
 
-// ツリーノード基底
+/**
+ * ツリーノード基底インターフェース
+ */
 export interface TreeNode {
   type: TreeNodeType;
   label: string;
@@ -12,41 +31,175 @@ export interface TreeNode {
   command?: vscode.Command;
 }
 
-// 検索設定ノード
+/**
+ * 検索設定ノード
+ */
 export interface ConfigNode extends TreeNode {
   type: 'config';
   configKey: 'search' | 'include' | 'exclude';
   value: string;
 }
 
-// アクションノード
+/**
+ * アクションノード
+ */
 export interface ActionNode extends TreeNode {
   type: 'action';
   actionType: 'execute' | 'clear';
 }
 
-// フォルダノード
+/**
+ * フォルダノード
+ */
 export interface FolderNode extends TreeNode {
   type: 'folder';
   children: TreeNode[];
   collapsibleState: vscode.TreeItemCollapsibleState;
 }
 
-// ファイルノード
+/**
+ * ファイルノード
+ */
 export interface FileNode extends TreeNode {
   type: 'file';
   resourceUri: vscode.Uri;
 }
 
-// 検索パラメータ
+/**
+ * 検索パラメータ
+ */
 export interface SearchParams {
   searchPattern: string;
   includePattern: string;
   excludePattern: string;
 }
 
-// ファイルアイテム（ツリービュー用）- 後方互換性のため残す
-export interface FileItem {
-  label: string;           // 表示名（相対パス）
-  resourceUri: vscode.Uri; // ファイルの絶対パス
+/**
+ * 検索結果
+ */
+export interface SearchResult {
+  files: vscode.Uri[];
+  totalCount: number;
+  searchTime: number;
+  pattern: string;
 }
+
+/**
+ * 進捗情報
+ */
+export interface ProgressInfo {
+  current: number;
+  total: number;
+  message: string;
+}
+
+/**
+ * バリデーション結果
+ */
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
+/**
+ * 設定の種類
+ */
+export type ConfigKey = 'search' | 'include' | 'exclude';
+
+/**
+ * アクションの種類
+ */
+export type ActionType = 'execute' | 'clear';
+
+/**
+ * ファイル検索のオプション
+ */
+export interface SearchOptions {
+  batchSize?: number;
+  maxResults?: number;
+  showProgress?: boolean;
+  caseSensitive?: boolean;
+}
+
+/**
+ * ツリー構築のオプション
+ */
+export interface TreeBuildOptions {
+  sortFoldersFirst?: boolean;
+  expandAll?: boolean;
+  maxDepth?: number;
+}
+
+/**
+ * エラーの種類
+ */
+export type ErrorType = 'validation' | 'search' | 'config' | 'regex' | 'unknown';
+
+/**
+ * ログレベル
+ */
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+
+/**
+ * イベントの種類
+ */
+export type EventType = 'searchStarted' | 'searchCompleted' | 'searchFailed' | 'configChanged' | 'resultsCleared';
+
+/**
+ * イベントデータ
+ */
+export interface EventData {
+  type: EventType;
+  timestamp: number;
+  data?: any;
+}
+
+/**
+ * パフォーマンス統計
+ */
+export interface PerformanceStats {
+  searchTime: number;
+  fileCount: number;
+  memoryUsage: number;
+  batchCount: number;
+}
+
+/**
+ * 設定の変更イベント
+ */
+export interface ConfigChangeEvent {
+  key: ConfigKey;
+  oldValue: string;
+  newValue: string;
+}
+
+/**
+ * 検索の状態
+ */
+export type SearchState = 'idle' | 'searching' | 'completed' | 'error';
+
+/**
+ * 検索状態の情報
+ */
+export interface SearchStateInfo {
+  state: SearchState;
+  progress?: ProgressInfo;
+  error?: string;
+  results?: SearchResult;
+}
+
+/**
+ * ユーティリティ型
+ */
+export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+export type Required<T, K extends keyof T> = T & { [P in K]-?: T[P] };
+export type NonNullable<T> = T extends null | undefined ? never : T;
+
+/**
+ * 関数の型定義
+ */
+export type AsyncFunction<T, R> = (arg: T) => Promise<R>;
+export type SyncFunction<T, R> = (arg: T) => R;
+export type EventHandler<T> = (data: T) => void | Promise<void>;
+export type Validator<T> = (value: T) => ValidationResult;
+export type Transformer<T, R> = (value: T) => R;
