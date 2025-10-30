@@ -3,7 +3,7 @@
 VSCode でファイル名を正規表現パターンで検索できる拡張機能です。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/ioEl0xFF/RegexFileFinder)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/ioEl0xFF/RegexFileFinder)
 
 ## 機能
 
@@ -27,7 +27,7 @@ VSCode でファイル名を正規表現パターンで検索できる拡張機�
 **またはコマンドラインから**:
 
 ```bash
-code --install-extension regex-file-finder-0.1.0.vsix
+code --install-extension regex-file-finder-2.0.0.vsix
 ```
 
 ### 開発版をビルドしてインストール
@@ -42,13 +42,13 @@ code --install-extension regex-file-finder-0.1.0.vsix
    npm install
    ```
 3. パッケージをビルド
-   ```bash
-   npm run vsce:package
-   ```
+```bash
+npm run vsce:package
+```
 4. 生成された`.vsix`ファイルをインストール
-   ```bash
-   code --install-extension regex-file-finder-0.1.0.vsix
-   ```
+```bash
+code --install-extension regex-file-finder-2.0.0.vsix
+```
 
 ## 使い方
 
