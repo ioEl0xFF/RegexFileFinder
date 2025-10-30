@@ -31,7 +31,11 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
     };
 
     const params = this.config.searchParams;
-    webviewView.webview.html = this.getHtml(params.searchPattern);
+    webviewView.webview.html = this.getHtml(
+      params.searchPattern,
+      params.includeFolders.join(', '),
+      params.excludeFolders.join(', ')
+    );
 
     webviewView.webview.onDidReceiveMessage(async (message) => {
       try {
@@ -39,6 +43,14 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
           case 'update':
             if (message.field === 'search') {
               const value = String(message.value ?? '');
+              
+              // 空文字列の場合は検索結果をクリア
+              if (!value || value.trim() === '') {
+                await this.treeProvider.updateSearchPattern('');
+                this.treeProvider.clearResults();
+                return;
+              }
+              
               const result = RegexValidator.validate(value);
               if (!result.isValid) {
                 await ErrorHandler.showWarning(result.error ?? '無効なパターンです');
@@ -46,6 +58,16 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
               }
               await this.treeProvider.updateSearchPattern(value);
               // 自動検索実行
+              await this.treeProvider.executeSearch();
+            } else if (message.field === 'includeFolders') {
+              const value = String(message.value ?? '');
+              const folders = this.parseFolderList(value);
+              await this.config.setIncludeFolders(folders);
+              await this.treeProvider.executeSearch();
+            } else if (message.field === 'excludeFolders') {
+              const value = String(message.value ?? '');
+              const folders = this.parseFolderList(value);
+              await this.config.setExcludeFolders(folders);
               await this.treeProvider.executeSearch();
             }
             break;
@@ -61,9 +83,22 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
   }
 
   /**
+   * カンマ区切りの文字列を配列に変換（空文字列要素を除外）
+   */
+  private parseFolderList(value: string): string[] {
+    if (!value || value.trim() === '') {
+      return [];
+    }
+    return value
+      .split(',')
+      .map(folder => folder.trim())
+      .filter(folder => folder.length > 0);
+  }
+
+  /**
    * HTMLコンテンツを生成
    */
-  private getHtml(searchPattern: string): string {
+  private getHtml(searchPattern: string, includeFolders: string, excludeFolders: string): string {
     const nonce = String(Date.now());
     const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
@@ -119,6 +154,16 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
       <input id="search" type="text" placeholder="例: .*\\.tsx$" value="${esc(searchPattern)}" />
       <div class="help-text">入力すると自動的に検索が実行されます</div>
     </div>
+    <div>
+      <div class="label">含むフォルダ（グロブパターン、カンマ区切り）</div>
+      <input id="includeFolders" type="text" placeholder="例: **/src/**, **/lib/**" value="${esc(includeFolders)}" />
+      <div class="help-text">空欄の場合は全フォルダを対象</div>
+    </div>
+    <div>
+      <div class="label">含まないフォルダ（グロブパターン、カンマ区切り）</div>
+      <input id="excludeFolders" type="text" placeholder="例: **/node_modules/**, **/dist/**" value="${esc(excludeFolders)}" />
+      <div class="help-text">検索対象から除外するフォルダ</div>
+    </div>
   </div>
 
   <script nonce="${nonce}">
@@ -133,6 +178,8 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
     }
 
     const searchInput = document.getElementById('search');
+    const includeFoldersInput = document.getElementById('includeFolders');
+    const excludeFoldersInput = document.getElementById('excludeFolders');
 
     const sendUpdate = debounce((field, value) => {
       vscode.postMessage({ type: 'update', field, value });
@@ -140,6 +187,14 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
 
     searchInput.addEventListener('input', (e) => {
       sendUpdate('search', e.target.value);
+    });
+
+    includeFoldersInput.addEventListener('input', (e) => {
+      sendUpdate('includeFolders', e.target.value);
+    });
+
+    excludeFoldersInput.addEventListener('input', (e) => {
+      sendUpdate('excludeFolders', e.target.value);
     });
   </script>
 </body>

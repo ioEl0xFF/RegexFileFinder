@@ -70,6 +70,8 @@ export interface FileNode extends TreeNode {
  */
 export interface SearchParams {
   searchPattern: string;
+  includeFolders: string[];
+  excludeFolders: string[];
 }
 
 /**

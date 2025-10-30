@@ -10,7 +10,9 @@ export class ConfigService implements vscode.Disposable {
   private readonly _configKey = 'regexFileFinder';
   
   private _searchParams: SearchParams = {
-    searchPattern: ''
+    searchPattern: '',
+    includeFolders: [],
+    excludeFolders: []
   };
 
   constructor() {
@@ -33,6 +35,22 @@ export class ConfigService implements vscode.Disposable {
     await this.saveConfig();
   }
 
+  /**
+   * 含むフォルダを設定
+   */
+  async setIncludeFolders(folders: string[]): Promise<void> {
+    this._searchParams.includeFolders = folders;
+    await this.saveConfig();
+  }
+
+  /**
+   * 含まないフォルダを設定
+   */
+  async setExcludeFolders(folders: string[]): Promise<void> {
+    this._searchParams.excludeFolders = folders;
+    await this.saveConfig();
+  }
+
 
   /**
    * 設定を保存
@@ -47,6 +65,8 @@ export class ConfigService implements vscode.Disposable {
         : vscode.ConfigurationTarget.Global;
       
       await config.update('searchPattern', this._searchParams.searchPattern, target);
+      await config.update('includeFolders', this._searchParams.includeFolders, target);
+      await config.update('excludeFolders', this._searchParams.excludeFolders, target);
     } catch (error) {
       console.error('[ConfigService] 設定保存エラー:', error);
       throw new ConfigError(ERROR_MESSAGES.CONFIG_SAVE_ERROR, error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR));
@@ -60,13 +80,17 @@ export class ConfigService implements vscode.Disposable {
     try {
       const config = vscode.workspace.getConfiguration(this._configKey);
       this._searchParams = {
-        searchPattern: config.get('searchPattern', '')
+        searchPattern: config.get('searchPattern', ''),
+        includeFolders: config.get('includeFolders', []) || [],
+        excludeFolders: config.get('excludeFolders', []) || []
       };
     } catch (error) {
       console.warn('[ConfigService] 設定読み込みエラー:', error);
       // デフォルト値を使用（エラーを再スローしない）
       this._searchParams = {
-        searchPattern: ''
+        searchPattern: '',
+        includeFolders: [],
+        excludeFolders: []
       };
     }
   }

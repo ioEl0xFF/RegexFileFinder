@@ -79,6 +79,22 @@
           "type": "string",
           "default": "",
           "description": "デフォルトの検索パターン（正規表現）"
+        },
+        "regexFileFinder.includeFolders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "検索対象に含むフォルダ（グロブパターン、カンマ区切りで複数指定可能）"
+        },
+        "regexFileFinder.excludeFolders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "検索対象から除外するフォルダ（グロブパターン、カンマ区切りで複数指定可能）"
         }
       }
     },

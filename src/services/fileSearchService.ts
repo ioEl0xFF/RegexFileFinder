@@ -106,9 +106,9 @@ export class FileSearchService implements vscode.Disposable {
     const maxResults = options.maxResults || 10000;
     const showProgress = options.showProgress !== false;
 
-    // グロブパターンでファイル取得（固定値を使用）
-    const includeGlob = '**/*';
-    const excludeGlob = null; // VS Codeのデフォルト除外設定を使用
+    // グロブパターンでファイル取得
+    const includeGlob = this.buildIncludeGlob(params.includeFolders);
+    const excludeGlob = this.buildExcludeGlob(params.excludeFolders);
     
     const allFiles = await vscode.workspace.findFiles(includeGlob, excludeGlob);
 
@@ -160,6 +160,47 @@ export class FileSearchService implements vscode.Disposable {
     return matchedFiles;
   }
 
+
+  /**
+   * 含むフォルダのグロブパターンを構築
+   */
+  private buildIncludeGlob(includeFolders: string[]): string {
+    if (!includeFolders || includeFolders.length === 0) {
+      return '**/*';
+    }
+    
+    // VS Codeのグロブパターン形式: {pattern1,pattern2,pattern3}
+    const patterns = includeFolders.map(folder => folder.trim()).filter(folder => folder.length > 0);
+    if (patterns.length === 0) {
+      return '**/*';
+    }
+    
+    if (patterns.length === 1) {
+      return patterns[0];
+    }
+    
+    return `{${patterns.join(',')}}`;
+  }
+
+  /**
+   * 含まないフォルダのグロブパターンを構築
+   */
+  private buildExcludeGlob(excludeFolders: string[]): string | null {
+    if (!excludeFolders || excludeFolders.length === 0) {
+      return null; // VS Codeのデフォルト除外設定を使用
+    }
+    
+    const patterns = excludeFolders.map(folder => folder.trim()).filter(folder => folder.length > 0);
+    if (patterns.length === 0) {
+      return null;
+    }
+    
+    if (patterns.length === 1) {
+      return patterns[0];
+    }
+    
+    return `{${patterns.join(',')}}`;
+  }
 
   /**
    * 検索IDを生成
