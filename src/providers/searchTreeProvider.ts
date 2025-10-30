@@ -54,6 +54,10 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
           arguments: [element.resourceUri]
         };
         break;
+      default:
+        treeItem.collapsibleState = vscode.TreeItemCollapsibleState.None;
+        treeItem.contextValue = 'info';
+        break;
     }
     
     return treeItem;
@@ -64,7 +68,16 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
    */
   getChildren(element?: TreeNode): TreeNode[] {
     if (!element) {
-      // ルート: 検索結果のみ
+      // ルート: 検索結果またはガイドメッセージ
+      if (this._searchResults.length === 0) {
+        const pattern = this._configService.searchParams.searchPattern?.trim();
+        if (!pattern) {
+          return [this.createInfoNode('検索パターンを入力してください（例: .*\\.tsx$）')];
+        }
+        if (this._searchState === 'completed') {
+          return [this.createInfoNode('該当するファイルが見つかりませんでした')];
+        }
+      }
       return this._searchResults;
     }
     
@@ -326,6 +339,13 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
    */
   refresh(): void {
     this._onDidChangeTreeData.fire(undefined);
+  }
+
+  /**
+   * 情報表示用の単純なノードを作成
+   */
+  private createInfoNode(label: string): TreeNode {
+    return { type: 'config', label } as TreeNode;
   }
 
   /**
