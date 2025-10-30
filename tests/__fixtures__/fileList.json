@@ -1,0 +1,12 @@
+[
+  "/workspace/src/index.ts",
+  "/workspace/src/app.tsx",
+  "/workspace/src/components/Button.tsx",
+  "/workspace/src/components/button.test.ts",
+  "/workspace/src/utils/regex.ts",
+  "/workspace/src/utils/treeBuilder.ts",
+  "/workspace/src/pages/HomePage.tsx",
+  "/workspace/src/pages/AboutPage.tsx",
+  "/workspace/README.md",
+  "/workspace/package.json"
+]
