@@ -335,7 +335,12 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
     try {
       const searchParams = this._configService.searchParams;
       
-      // 常に検索を実行
+      // 空文字列の場合は検索をスキップ
+      if (!searchParams.searchPattern || searchParams.searchPattern.trim() === '') {
+        return;
+      }
+      
+      // 検索を実行
       await this.executeSearch();
     } catch (error) {
       console.warn('[SearchTreeProvider] 初期化時の自動検索でエラー:', error);
