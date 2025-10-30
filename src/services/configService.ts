@@ -15,6 +15,8 @@ export class ConfigService implements vscode.Disposable {
     excludeFolders: []
   };
 
+  private _replacementString = '';
+
   constructor() {
     this.loadConfig();
     this.setupConfigWatcher();
@@ -51,6 +53,21 @@ export class ConfigService implements vscode.Disposable {
     await this.saveConfig();
   }
 
+  /**
+   * 置換文字列を取得
+   */
+  get replacementString(): string {
+    return this._replacementString;
+  }
+
+  /**
+   * 置換文字列を設定
+   */
+  async setReplacementString(replacement: string): Promise<void> {
+    this._replacementString = replacement;
+    await this.saveConfig();
+  }
+
 
   /**
    * 設定を保存
@@ -67,6 +84,7 @@ export class ConfigService implements vscode.Disposable {
       await config.update('searchPattern', this._searchParams.searchPattern, target);
       await config.update('includeFolders', this._searchParams.includeFolders, target);
       await config.update('excludeFolders', this._searchParams.excludeFolders, target);
+      await config.update('replacementString', this._replacementString, target);
     } catch (error) {
       console.error('[ConfigService] 設定保存エラー:', error);
       throw new ConfigError(ERROR_MESSAGES.CONFIG_SAVE_ERROR, error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR));
@@ -84,6 +102,7 @@ export class ConfigService implements vscode.Disposable {
         includeFolders: config.get('includeFolders', []) || [],
         excludeFolders: config.get('excludeFolders', []) || []
       };
+      this._replacementString = config.get('replacementString', '');
     } catch (error) {
       console.warn('[ConfigService] 設定読み込みエラー:', error);
       // デフォルト値を使用（エラーを再スローしない）
@@ -92,6 +111,7 @@ export class ConfigService implements vscode.Disposable {
         includeFolders: [],
         excludeFolders: []
       };
+      this._replacementString = '';
     }
   }
 

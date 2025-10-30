@@ -70,6 +70,18 @@
         "command": "regexFileFinder.collapseAll",
         "title": "すべて折りたたむ",
         "icon": "$(collapse-all)"
+      },
+      {
+        "command": "regexFileFinder.executeRename",
+        "title": "ファイル名を置き換え"
+      },
+      {
+        "command": "regexFileFinder.undoRename",
+        "title": "Undo"
+      },
+      {
+        "command": "regexFileFinder.redoRename",
+        "title": "Redo"
       }
     ],
     "configuration": {
@@ -95,6 +107,11 @@
           },
           "default": [],
           "description": "検索対象から除外するフォルダ（グロブパターン、カンマ区切りで複数指定可能）"
+        },
+        "regexFileFinder.replacementString": {
+          "type": "string",
+          "default": "",
+          "description": "ファイル名置き換え用の置換文字列（検索パターンを正規表現として使用）"
         }
       }
     },

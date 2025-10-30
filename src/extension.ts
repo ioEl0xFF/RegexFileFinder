@@ -29,10 +29,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
 
     // コマンドの登録
-    registerSearchCommands(context, searchTreeProvider);
+    registerSearchCommands(context, searchTreeProvider, inputProvider);
 
     // プロバイダーをコンテキストに追加（クリーンアップ用）
     context.subscriptions.push(searchTreeProvider);
+    context.subscriptions.push(inputProvider);
 
     // 初期化時の自動検索実行
     try {
