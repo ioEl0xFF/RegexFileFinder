@@ -134,7 +134,14 @@
     "compile": "webpack",
     "watch": "webpack --watch",
     "package": "webpack --mode production --devtool hidden-source-map",
-    "vsce:package": "vsce package"
+    "vsce:package": "vsce package",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
+    "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "prepare": "husky install"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
@@ -147,6 +154,22 @@
     "ts-loader": "^9.5.0",
     "typescript": "^5.9.3",
     "webpack": "^5.89.0",
-    "webpack-cli": "^5.1.0"
+    "webpack-cli": "^5.1.0",
+    "eslint": "^9.12.0",
+    "@typescript-eslint/eslint-plugin": "^8.8.1",
+    "@typescript-eslint/parser": "^8.8.1",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.10"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "**/*.{json,md,css,scss,yml,yaml}": [
+      "prettier --write"
+    ]
   }
 }
