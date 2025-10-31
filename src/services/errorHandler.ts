@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { Logger } from './logger';
+import { t } from '../utils/i18n';
 
 /**
  * カスタムエラークラス群
@@ -25,7 +26,10 @@ export class RegexError extends Error {
 export class SearchError extends Error {
   public readonly code = 'SEARCH_ERROR';
 
-  constructor(message: string, public readonly cause?: Error) {
+  constructor(
+    message: string,
+    public readonly cause?: Error
+  ) {
     super(message);
     this.name = 'SearchError';
   }
@@ -37,7 +41,10 @@ export class SearchError extends Error {
 export class ConfigError extends Error {
   public readonly code = 'CONFIG_ERROR';
 
-  constructor(message: string, public readonly cause?: Error) {
+  constructor(
+    message: string,
+    public readonly cause?: Error
+  ) {
     super(message);
     this.name = 'ConfigError';
   }
@@ -50,13 +57,16 @@ export class RenameError extends Error {
   public readonly code = 'RENAME_ERROR';
   public readonly fileUri?: vscode.Uri;
 
-  constructor(message: string, fileUri?: vscode.Uri, public readonly cause?: Error) {
+  constructor(
+    message: string,
+    fileUri?: vscode.Uri,
+    public readonly cause?: Error
+  ) {
     super(message);
     this.name = 'RenameError';
     this.fileUri = fileUri;
   }
 }
-
 
 /**
  * 統一的なエラーハンドリング機能
@@ -69,20 +79,20 @@ export class ErrorHandler {
     Logger.logError(error, context);
 
     let userMessage: string;
-    
+
     if (error instanceof RegexError) {
-      userMessage = `正規表現エラー: ${error.message}\n\n入力されたパターン: "${error.pattern}"\n\n例:\n• .*\\.tsx$ - TSXファイル\n• ^test.*\\.js$ - testで始まるJSファイル\n• .*component.* - "component"を含むファイル`;
+      userMessage = t('errors.regexError', error.message, error.pattern);
     } else if (error instanceof SearchError) {
-      userMessage = `検索エラー: ${error.message}`;
+      userMessage = t('errors.searchError', error.message);
     } else if (error instanceof ConfigError) {
-      userMessage = `設定エラー: ${error.message}`;
+      userMessage = t('errors.configError', error.message);
     } else if (error instanceof RenameError) {
-      userMessage = `ファイル名置き換えエラー: ${error.message}`;
+      userMessage = t('errors.renameError', error.message);
     } else if (error.name === 'Canceled') {
       // キャンセルエラーは表示しない
       return;
     } else {
-      userMessage = `${ERROR_MESSAGES.UNKNOWN_ERROR}: ${error.message}`;
+      userMessage = `${t('errors.unknownError')}: ${error.message}`;
     }
 
     try {
@@ -140,11 +150,11 @@ export class ErrorHandler {
       if (error instanceof Error && error.name === 'Canceled') {
         return fallback;
       }
-      
+
       if (error instanceof Error) {
         await this.showError(error, context);
       } else {
-        await this.showError(new Error('不明なエラーが発生しました'), context);
+        await this.showError(new Error(t('errors.unknownError')), context);
       }
       return fallback;
     }
@@ -173,32 +183,33 @@ export class ErrorHandler {
 }
 
 /**
- * エラーメッセージの定数
+ * エラーメッセージの定数（翻訳キーへの移行のため、後方互換性のために残す）
+ * @deprecated 代わりに t() 関数を使用してください
  */
 export const ERROR_MESSAGES = {
-  INVALID_REGEX: '無効な正規表現パターンです',
-  EMPTY_PATTERN: '正規表現パターンを入力してください',
-  WORKSPACE_NOT_OPEN: 'ワークスペースが開かれていません',
-  SEARCH_FAILED: '検索に失敗しました',
-  FILE_ACCESS_ERROR: 'ファイルアクセスエラーが発生しました',
-  CONFIG_SAVE_ERROR: '設定の保存に失敗しました',
-  CONFIG_LOAD_ERROR: '設定の読み込みに失敗しました',
-  PATTERN_TOO_COMPLEX: '正規表現パターンが複雑すぎます',
-  PATTERN_TOO_LONG: '正規表現パターンが長すぎます（1000文字以内）',
-  DANGEROUS_PATTERN: 'パフォーマンス上の理由で、このパターンは使用できません',
-  UNKNOWN_ERROR: '不明なエラーが発生しました',
-  CANCELLED: '操作がキャンセルされました',
+  INVALID_REGEX: 'errors.invalidRegex',
+  EMPTY_PATTERN: 'errors.emptyPattern',
+  WORKSPACE_NOT_OPEN: 'errors.workspaceNotOpen',
+  SEARCH_FAILED: 'errors.searchFailed',
+  FILE_ACCESS_ERROR: 'errors.fileAccessError',
+  CONFIG_SAVE_ERROR: 'errors.configSaveError',
+  CONFIG_LOAD_ERROR: 'errors.configLoadError',
+  PATTERN_TOO_COMPLEX: 'errors.patternTooComplex',
+  PATTERN_TOO_LONG: 'errors.patternTooLong',
+  DANGEROUS_PATTERN: 'errors.dangerousPattern',
+  UNKNOWN_ERROR: 'errors.unknownError',
+  CANCELLED: 'errors.cancelled',
   // ファイル名置き換え関連
-  NO_REPLACEMENT_STRING: '置換文字列が入力されていません',
-  INVALID_FILE_NAME: '無効なファイル名です',
-  DUPLICATE_FILE_NAME: '同名のファイルが既に存在します',
-  RENAME_FAILED: 'ファイル名の置き換えに失敗しました',
-  DIRECTORY_CREATE_FAILED: 'ディレクトリの作成に失敗しました',
-  RENAME_VALIDATION_FAILED: '置き換えの検証に失敗しました',
-  UNDO_FAILED: 'Undo操作に失敗しました',
-  REDO_FAILED: 'Redo操作に失敗しました',
-  NO_UNDO_HISTORY: 'Undo履歴がありません',
-  NO_REDO_HISTORY: 'Redo履歴がありません'
+  NO_REPLACEMENT_STRING: 'errors.noReplacementString',
+  INVALID_FILE_NAME: 'errors.invalidFileName',
+  DUPLICATE_FILE_NAME: 'errors.duplicateFileName',
+  RENAME_FAILED: 'errors.renameFailed',
+  DIRECTORY_CREATE_FAILED: 'errors.directoryCreateFailed',
+  RENAME_VALIDATION_FAILED: 'errors.renameValidationFailed',
+  UNDO_FAILED: 'errors.undoFailed',
+  REDO_FAILED: 'errors.redoFailed',
+  NO_UNDO_HISTORY: 'errors.noUndoHistory',
+  NO_REDO_HISTORY: 'errors.noRedoHistory',
 } as const;
 
 /**
@@ -208,5 +219,5 @@ export const ERROR_CODES = {
   REGEX_ERROR: 'REGEX_ERROR',
   SEARCH_ERROR: 'SEARCH_ERROR',
   CONFIG_ERROR: 'CONFIG_ERROR',
-  RENAME_ERROR: 'RENAME_ERROR'
+  RENAME_ERROR: 'RENAME_ERROR',
 } as const;

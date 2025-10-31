@@ -2,8 +2,9 @@ import * as vscode from 'vscode';
 import { registerSearchCommands } from './commands/searchCommands';
 import { SearchInputViewProvider } from './providers/searchInputViewProvider';
 import { SearchTreeProvider } from './providers/searchTreeProvider';
-import { ERROR_MESSAGES, ErrorHandler } from './services/errorHandler';
+import { ErrorHandler } from './services/errorHandler';
 import { Logger } from './services/logger';
+import { initializeI18n, t } from './utils/i18n';
 
 /**
  * 拡張機能のアクティベーション処理
@@ -14,6 +15,9 @@ export async function activate(
   try {
     // Loggerの初期化（ExtensionContextを設定）
     Logger.initialize(context);
+
+    // i18nの初期化
+    initializeI18n(context);
 
     // 検索TreeProviderの初期化
     const searchTreeProvider = new SearchTreeProvider();
@@ -43,7 +47,7 @@ export async function activate(
     );
 
     // コマンドの登録
-    registerSearchCommands(context, searchTreeProvider, inputProvider);
+    registerSearchCommands(context, searchTreeProvider);
 
     // プロバイダーをコンテキストに追加（クリーンアップ用）
     context.subscriptions.push(searchTreeProvider);
@@ -71,11 +75,11 @@ export async function activate(
     }
   } catch (error) {
     Logger.logError(
-      error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
+      error instanceof Error ? error : new Error(t('errors.unknownError')),
       'Extension.activate'
     );
     ErrorHandler.showError(
-      error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
+      error instanceof Error ? error : new Error(t('errors.unknownError')),
       'Extension.activate'
     );
   }

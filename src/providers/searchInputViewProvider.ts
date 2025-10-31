@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
-import { ERROR_MESSAGES, ErrorHandler } from '../services/errorHandler';
+import { ErrorHandler } from '../services/errorHandler';
 import { FileRenameService } from '../services/fileRenameService';
 import { Logger } from '../services/logger';
+import { t } from '../utils/i18n';
 import { RegexValidator } from '../utils/regexValidator';
 import { SearchTreeProvider } from './searchTreeProvider';
 
@@ -33,7 +34,7 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
     webviewView.webview.options = {
-      enableScripts: true
+      enableScripts: true,
     };
 
     const params = this.config.searchParams;
@@ -47,22 +48,27 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (message) => {
       try {
         // messageをログに残す
-        Logger.logDebug(`受信メッセージ: ${JSON.stringify(message)}`, 'SearchInputViewProvider');
+        Logger.logDebug(
+          `受信メッセージ: ${JSON.stringify(message)}`,
+          'SearchInputViewProvider'
+        );
         switch (message.type) {
           case 'update':
             if (message.field === 'search') {
               const value = String(message.value ?? '');
-              
+
               // 空文字列の場合は検索結果をクリア
               if (!value || value.trim() === '') {
                 await this.treeProvider.updateSearchPattern('');
                 this.treeProvider.clearResults();
                 return;
               }
-              
+
               const result = RegexValidator.validate(value);
               if (!result.isValid) {
-                await ErrorHandler.showWarning(result.error ?? '無効なパターンです');
+                await ErrorHandler.showWarning(
+                  result.error ?? '無効なパターンです'
+                );
                 return;
               }
               await this.treeProvider.updateSearchPattern(value);
@@ -100,11 +106,10 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
           case 'requestPreview':
             await this.updatePreview();
             break;
-
         }
       } catch (error) {
         await ErrorHandler.showError(
-          error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
+          error instanceof Error ? error : new Error(t('errors.unknownError')),
           'SearchInputViewProvider.onMessage'
         );
       }
@@ -120,8 +125,8 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
     }
     return value
       .split(',')
-      .map(folder => folder.trim())
-      .filter(folder => folder.length > 0);
+      .map((folder) => folder.trim())
+      .filter((folder) => folder.length > 0);
   }
 
   /**
@@ -138,7 +143,7 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
     if (!searchParams.searchPattern || !replacement) {
       this.view.webview.postMessage({
         type: 'previewUpdate',
-        previews: []
+        previews: [],
       });
       return;
     }
@@ -148,7 +153,7 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
     if (!searchResults.results) {
       this.view.webview.postMessage({
         type: 'previewUpdate',
-        previews: []
+        previews: [],
       });
       return;
     }
@@ -161,11 +166,11 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
 
     this.view.webview.postMessage({
       type: 'previewUpdate',
-      previews: previews.slice(0, 5).map(p => ({
+      previews: previews.slice(0, 5).map((p) => ({
         oldFileName: p.oldFileName,
         newFileName: p.newFileName,
-        needsDirectoryMove: p.needsDirectoryMove
-      }))
+        needsDirectoryMove: p.needsDirectoryMove,
+      })),
     });
   }
 
@@ -174,7 +179,10 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
    */
   private async executeRename(): Promise<void> {
     if (!this.view) {
-      Logger.logError(new Error('viewが存在しません'), 'SearchInputViewProvider.executeRename');
+      Logger.logError(
+        new Error('viewが存在しません'),
+        'SearchInputViewProvider.executeRename'
+      );
       return;
     }
 
@@ -182,14 +190,14 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
     const replacement = this.config.replacementString;
 
     if (!searchParams.searchPattern || !replacement) {
-      await ErrorHandler.showWarning(ERROR_MESSAGES.NO_REPLACEMENT_STRING);
+      await ErrorHandler.showWarning(t('errors.noReplacementString'));
       return;
     }
 
     // 検索結果からファイルリストを取得
     const searchResults = this.treeProvider.getSearchState();
     if (!searchResults.results || searchResults.results.files.length === 0) {
-      await ErrorHandler.showWarning('置き換え対象のファイルがありません');
+      await ErrorHandler.showWarning(t('commands.noFilesToRename'));
       return;
     }
 
@@ -200,16 +208,16 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
     );
 
     if (previews.length === 0) {
-      await ErrorHandler.showWarning('置き換え対象のファイルが見つかりませんでした');
+      await ErrorHandler.showWarning(t('commands.noFilesToRename'));
       return;
     }
 
     // 検証
     const validation = await this.renameService.validateRename(previews);
-    
+
     if (!validation.isValid) {
       await ErrorHandler.showError(
-        new Error(validation.error || ERROR_MESSAGES.RENAME_VALIDATION_FAILED),
+        new Error(validation.error || t('errors.renameValidationFailed')),
         'SearchInputViewProvider.executeRename'
       );
       return;
@@ -217,41 +225,55 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
 
     // 警告がある場合は確認ダイアログを表示
     if (validation.warnings && validation.warnings.length > 0) {
-      const message = validation.warnings.join('\n') + '\n\n続行しますか？';
+      const message =
+        validation.warnings.join('\n') +
+        '\n\n' +
+        t('commands.continueRenameQuestion');
       const action = await vscode.window.showWarningMessage(
         message,
         { modal: true },
-        '続行'
+        t('commands.continueRename')
       );
-      
-      if (action !== '続行') {
+
+      if (action !== t('commands.continueRename')) {
         return;
       }
     }
 
     // 実行
     try {
-      const result = await vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        title: 'ファイル名を置き換え中...',
-        cancellable: false
-      }, async (progress) => {
-        return await this.renameService.executeRename(previews);
-      });
+      const result = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: t('commands.renaming'),
+          cancellable: false,
+        },
+        async () => {
+          return await this.renameService.executeRename(previews);
+        }
+      );
 
       // プログレス通知が閉じた後に結果を表示（非同期で実行）
       if (result.failureCount > 0) {
         ErrorHandler.showWarning(
-          `一部のファイルの置き換えに失敗しました（${result.failureCount}件）`
-        ).catch(error => {
+          t('commands.renamePartialFailure', result.failureCount)
+        ).catch((error) => {
           if (error.name !== 'Canceled') {
-            Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchInputViewProvider.showWarning');
+            Logger.logError(
+              error instanceof Error ? error : new Error(String(error)),
+              'SearchInputViewProvider.showWarning'
+            );
           }
         });
       } else {
-        ErrorHandler.showInfo(`${result.successCount}件のファイル名を置き換えました`).catch(error => {
+        ErrorHandler.showInfo(
+          t('commands.renameSuccess', result.successCount)
+        ).catch((error) => {
           if (error.name !== 'Canceled') {
-            Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchInputViewProvider.showInfo');
+            Logger.logError(
+              error instanceof Error ? error : new Error(String(error)),
+              'SearchInputViewProvider.showInfo'
+            );
           }
         });
       }
@@ -260,7 +282,7 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
       await this.treeProvider.executeSearch();
     } catch (error) {
       await ErrorHandler.showError(
-        error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
+        error instanceof Error ? error : new Error(t('errors.unknownError')),
         'SearchInputViewProvider.executeRename'
       );
     }
@@ -271,27 +293,36 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
    */
   private async undoRename(): Promise<void> {
     try {
-      const result = await vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        title: 'Undo中...',
-        cancellable: false
-      }, async () => {
-        return await this.renameService.undo();
-      });
+      const result = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: t('commands.undoing'),
+          cancellable: false,
+        },
+        async () => {
+          return await this.renameService.undo();
+        }
+      );
 
       // プログレス通知が閉じた後に結果を表示（非同期で実行）
       if (result.failureCount > 0) {
         ErrorHandler.showWarning(
-          `一部のUndo操作に失敗しました（${result.failureCount}件）`
-        ).catch(error => {
+          t('commands.undoPartialFailure', result.failureCount)
+        ).catch((error) => {
           if (error.name !== 'Canceled') {
-            Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchInputViewProvider.showWarning');
+            Logger.logError(
+              error instanceof Error ? error : new Error(String(error)),
+              'SearchInputViewProvider.showWarning'
+            );
           }
         });
       } else {
-        ErrorHandler.showInfo('Undoしました').catch(error => {
+        ErrorHandler.showInfo(t('commands.undoSuccess')).catch((error) => {
           if (error.name !== 'Canceled') {
-            Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchInputViewProvider.showInfo');
+            Logger.logError(
+              error instanceof Error ? error : new Error(String(error)),
+              'SearchInputViewProvider.showInfo'
+            );
           }
         });
       }
@@ -300,7 +331,7 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
       await this.treeProvider.executeSearch();
     } catch (error) {
       await ErrorHandler.showError(
-        error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
+        error instanceof Error ? error : new Error(t('errors.unknownError')),
         'SearchInputViewProvider.undoRename'
       );
     }
@@ -311,27 +342,36 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
    */
   private async redoRename(): Promise<void> {
     try {
-      const result = await vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        title: 'Redo中...',
-        cancellable: false
-      }, async () => {
-        return await this.renameService.redo();
-      });
+      const result = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: t('commands.redoing'),
+          cancellable: false,
+        },
+        async () => {
+          return await this.renameService.redo();
+        }
+      );
 
       // プログレス通知が閉じた後に結果を表示（非同期で実行）
       if (result.failureCount > 0) {
         ErrorHandler.showWarning(
-          `一部のRedo操作に失敗しました（${result.failureCount}件）`
-        ).catch(error => {
+          t('commands.redoPartialFailure', result.failureCount)
+        ).catch((error) => {
           if (error.name !== 'Canceled') {
-            Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchInputViewProvider.showWarning');
+            Logger.logError(
+              error instanceof Error ? error : new Error(String(error)),
+              'SearchInputViewProvider.showWarning'
+            );
           }
         });
       } else {
-        ErrorHandler.showInfo('Redoしました').catch(error => {
+        ErrorHandler.showInfo(t('commands.redoSuccess')).catch((error) => {
           if (error.name !== 'Canceled') {
-            Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchInputViewProvider.showInfo');
+            Logger.logError(
+              error instanceof Error ? error : new Error(String(error)),
+              'SearchInputViewProvider.showInfo'
+            );
           }
         });
       }
@@ -340,7 +380,7 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
       await this.treeProvider.executeSearch();
     } catch (error) {
       await ErrorHandler.showError(
-        error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
+        error instanceof Error ? error : new Error(t('errors.unknownError')),
         'SearchInputViewProvider.redoRename'
       );
     }
@@ -349,11 +389,17 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
   /**
    * HTMLコンテンツを生成
    */
-  private getHtml(searchPattern: string, includeFolders: string, excludeFolders: string, replacementString: string): string {
+  private getHtml(
+    searchPattern: string,
+    includeFolders: string,
+    excludeFolders: string,
+    replacementString: string
+  ): string {
     const nonce = String(Date.now());
-    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const esc = (s: string): string =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
-    return /* html */`
+    return /* html */ `
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -439,30 +485,30 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
 <body>
   <div class="container">
     <div>
-      <div class="label">検索パターン（正規表現）</div>
-      <input id="search" type="text" placeholder="例: .*\\.tsx$" value="${esc(searchPattern)}" />
-      <div class="help-text">入力すると自動的に検索が実行されます</div>
+      <div class="label">${esc(t('ui.searchPattern.label'))}</div>
+      <input id="search" type="text" placeholder="${esc(t('ui.searchPattern.placeholder'))}" value="${esc(searchPattern)}" />
+      <div class="help-text">${esc(t('ui.searchPattern.helpText'))}</div>
     </div>
     <div>
-      <div class="label">含むフォルダ（グロブパターン、カンマ区切り）</div>
-      <input id="includeFolders" type="text" placeholder="例: **/src/**, **/lib/**" value="${esc(includeFolders)}" />
-      <div class="help-text">空欄の場合は全フォルダを対象</div>
+      <div class="label">${esc(t('ui.includeFolders.label'))}</div>
+      <input id="includeFolders" type="text" placeholder="${esc(t('ui.includeFolders.placeholder'))}" value="${esc(includeFolders)}" />
+      <div class="help-text">${esc(t('ui.includeFolders.helpText'))}</div>
     </div>
     <div>
-      <div class="label">含まないフォルダ（グロブパターン、カンマ区切り）</div>
-      <input id="excludeFolders" type="text" placeholder="例: **/node_modules/**, **/dist/**" value="${esc(excludeFolders)}" />
-      <div class="help-text">検索対象から除外するフォルダ</div>
+      <div class="label">${esc(t('ui.excludeFolders.label'))}</div>
+      <input id="excludeFolders" type="text" placeholder="${esc(t('ui.excludeFolders.placeholder'))}" value="${esc(excludeFolders)}" />
+      <div class="help-text">${esc(t('ui.excludeFolders.helpText'))}</div>
     </div>
     <div>
-      <div class="label">置換文字列</div>
-      <input id="replacement" type="text" placeholder="例: $1_renamed, sub/$1" value="${esc(replacementString)}" />
-      <div class="help-text">検索パターンを正規表現として使用します。\\$1, \\$2 などでキャプチャグループを使用可能</div>
+      <div class="label">${esc(t('ui.replacement.label'))}</div>
+      <input id="replacement" type="text" placeholder="${esc(t('ui.replacement.placeholder'))}" value="${esc(replacementString)}" />
+      <div class="help-text">${esc(t('ui.replacement.helpText'))}</div>
     </div>
     <div id="previewContainer"></div>
     <div class="button-group">
-      <button id="executeRename">置き換え実行</button>
-      <button id="undo">Undo</button>
-      <button id="redo">Redo</button>
+      <button id="executeRename">${esc(t('ui.buttons.executeRename'))}</button>
+      <button id="undo">${esc(t('ui.buttons.undo'))}</button>
+      <button id="redo">${esc(t('ui.buttons.redo'))}</button>
     </div>
   </div>
 
@@ -540,13 +586,15 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
       }
     });
 
+    const previewLabel = ${JSON.stringify(t('ui.preview.label'))};
+
     function updatePreview(previews) {
       if (!previews || previews.length === 0) {
         previewContainer.innerHTML = '';
         return;
       }
 
-      let html = '<div class="preview-container"><strong>プレビュー:</strong><br/>';
+      let html = '<div class="preview-container"><strong>' + previewLabel + '</strong><br/>';
       for (const preview of previews) {
         const className = preview.needsDirectoryMove ? 'preview-item warning' : 'preview-item';
         html += '<div class="' + className + '">' + preview.oldFileName + ' → ' + preview.newFileName + '</div>';
@@ -566,7 +614,7 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
    * リソースをクリーンアップ
    */
   dispose(): void {
-    this._disposables.forEach(disposable => disposable.dispose());
+    this._disposables.forEach((disposable) => disposable.dispose());
     this._disposables.length = 0;
   }
 }
