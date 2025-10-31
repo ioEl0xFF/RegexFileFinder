@@ -8,25 +8,38 @@ import { Logger } from './services/logger';
 /**
  * 拡張機能のアクティベーション処理
  */
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
-
+export async function activate(
+  context: vscode.ExtensionContext
+): Promise<void> {
   try {
+    // Loggerの初期化（ExtensionContextを設定）
+    Logger.initialize(context);
+
     // 検索TreeProviderの初期化
     const searchTreeProvider = new SearchTreeProvider();
-    
+
     // TreeViewの登録
-    const treeView = vscode.window.createTreeView('regexFileFinder.searchResults', {
-      treeDataProvider: searchTreeProvider
-    });
+    const treeView = vscode.window.createTreeView(
+      'regexFileFinder.searchResults',
+      {
+        treeDataProvider: searchTreeProvider,
+      }
+    );
     context.subscriptions.push(treeView);
 
     // TreeViewインスタンスをプロバイダーに設定
     searchTreeProvider.setTreeView(treeView);
 
     // 入力ビュー（WebviewView）の登録
-    const inputProvider = new SearchInputViewProvider(context, searchTreeProvider);
+    const inputProvider = new SearchInputViewProvider(
+      context,
+      searchTreeProvider
+    );
     context.subscriptions.push(
-      vscode.window.registerWebviewViewProvider(SearchInputViewProvider.viewId, inputProvider)
+      vscode.window.registerWebviewViewProvider(
+        SearchInputViewProvider.viewId,
+        inputProvider
+      )
     );
 
     // コマンドの登録
@@ -46,12 +59,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     try {
       await searchTreeProvider.executeSearchIfConfigured();
     } catch (error) {
-      Logger.logWarning('初期化時の自動検索でエラーが発生しました', 'Extension');
-      Logger.logError(error instanceof Error ? error : new Error(String(error)), 'Extension.activate');
+      Logger.logWarning(
+        '初期化時の自動検索でエラーが発生しました',
+        'Extension'
+      );
+      Logger.logError(
+        error instanceof Error ? error : new Error(String(error)),
+        'Extension.activate'
+      );
       // エラーが発生しても拡張機能の初期化は継続
     }
   } catch (error) {
-    Logger.logError(error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR), 'Extension.activate');
+    Logger.logError(
+      error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
+      'Extension.activate'
+    );
     ErrorHandler.showError(
       error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
       'Extension.activate'
@@ -63,7 +85,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
  * 拡張機能の非アクティベーション処理
  */
 export function deactivate(): void {
-  
   try {
     // リソースのクリーンアップは context.subscriptions で自動的に実行される
     // 進行中の非同期処理は自動的にキャンセルされる

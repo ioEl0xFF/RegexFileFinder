@@ -114,9 +114,24 @@
         },
         "regexFileFinder.logLevel": {
           "type": "string",
-          "enum": ["DEBUG", "INFO", "WARN", "ERROR"],
+          "enum": [
+            "DEBUG",
+            "INFO",
+            "WARN",
+            "ERROR"
+          ],
           "default": "INFO",
           "description": "ログ出力レベル"
+        },
+        "regexFileFinder.logFileEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "ログファイルを出力するかどうか"
+        },
+        "regexFileFinder.logFileDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "ログファイルの保存ディレクトリ（空の場合はVS Code拡張機能のログディレクトリを使用）"
         }
       }
     },
