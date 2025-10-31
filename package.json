@@ -111,6 +111,12 @@
           "type": "string",
           "default": "",
           "description": "ファイル名置き換え用の置換文字列（検索パターンを正規表現として使用）"
+        },
+        "regexFileFinder.logLevel": {
+          "type": "string",
+          "enum": ["DEBUG", "INFO", "WARN", "ERROR"],
+          "default": "INFO",
+          "description": "ログ出力レベル"
         }
       }
     },
