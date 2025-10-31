@@ -1,6 +1,11 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { RenameHistory, RenamePreview, RenameResult, RenameValidationResult } from '../types';
+import {
+  RenameHistory,
+  RenamePreview,
+  RenameResult,
+  RenameValidationResult,
+} from '../types';
 import { ERROR_MESSAGES, RenameError } from './errorHandler';
 
 /**
@@ -15,7 +20,11 @@ export class FileRenameService implements vscode.Disposable {
   /**
    * 置き換えプレビューを生成
    */
-  previewRename(files: vscode.Uri[], searchPattern: string, replacement: string): RenamePreview[] {
+  previewRename(
+    files: vscode.Uri[],
+    searchPattern: string,
+    replacement: string
+  ): RenamePreview[] {
     if (!searchPattern || searchPattern.trim() === '') {
       return [];
     }
@@ -29,7 +38,7 @@ export class FileRenameService implements vscode.Disposable {
 
       // ファイル名に正規表現を適用して新しいファイル名を生成
       const newFileName = fileName.replace(regex, replacement);
-      
+
       // 置換が発生しなかった場合（パターンにマッチしない）はスキップ
       if (newFileName === fileName) {
         continue;
@@ -46,7 +55,7 @@ export class FileRenameService implements vscode.Disposable {
         newFileName,
         oldPath: file.fsPath,
         newPath,
-        needsDirectoryMove: file.fsPath !== newPath
+        needsDirectoryMove: file.fsPath !== newPath,
       });
     }
 
@@ -62,7 +71,7 @@ export class FileRenameService implements vscode.Disposable {
       const parts = newFileName.split('/');
       const fileName = parts.pop();
       const subDirs = parts.join('/');
-      
+
       // サブディレクトリを含めたパスを生成
       return path.join(directory, subDirs, fileName || '');
     }
@@ -74,7 +83,9 @@ export class FileRenameService implements vscode.Disposable {
   /**
    * 置き換えの検証
    */
-  async validateRename(previews: RenamePreview[]): Promise<RenameValidationResult> {
+  async validateRename(
+    previews: RenamePreview[]
+  ): Promise<RenameValidationResult> {
     const warnings: string[] = [];
     const duplicateFiles: RenamePreview[] = [];
     const directoriesToCreate: vscode.Uri[] = [];
@@ -107,7 +118,7 @@ export class FileRenameService implements vscode.Disposable {
         error: `${invalidFiles.length}件のファイル名が無効です。`,
         warnings,
         duplicateFiles,
-        directoriesToCreate
+        directoriesToCreate,
       };
     }
 
@@ -119,7 +130,7 @@ export class FileRenameService implements vscode.Disposable {
         if (stat) {
           conflictingFiles.push(preview);
         }
-      } catch (error) {
+      } catch {
         // ファイルが存在しない場合は正常（新規作成の可能性）
       }
     }
@@ -133,12 +144,12 @@ export class FileRenameService implements vscode.Disposable {
       if (preview.needsDirectoryMove) {
         const newDir = path.dirname(preview.newPath);
         const dirUri = vscode.Uri.file(newDir);
-        
+
         try {
           await vscode.workspace.fs.stat(dirUri);
-        } catch (error) {
+        } catch {
           // ディレクトリが存在しない場合は作成が必要
-          if (!directoriesToCreate.some(d => d.fsPath === dirUri.fsPath)) {
+          if (!directoriesToCreate.some((d) => d.fsPath === dirUri.fsPath)) {
             directoriesToCreate.push(dirUri);
           }
         }
@@ -149,7 +160,8 @@ export class FileRenameService implements vscode.Disposable {
       isValid: true,
       warnings: warnings.length > 0 ? warnings : undefined,
       duplicateFiles: duplicateFiles.length > 0 ? duplicateFiles : undefined,
-      directoriesToCreate: directoriesToCreate.length > 0 ? directoriesToCreate : undefined
+      directoriesToCreate:
+        directoriesToCreate.length > 0 ? directoriesToCreate : undefined,
     };
   }
 
@@ -163,6 +175,7 @@ export class FileRenameService implements vscode.Disposable {
     }
 
     // Windows/Linux/macOS の予約文字
+    // eslint-disable-next-line no-control-regex
     const invalidChars = /[<>:"|?*\x00-\x1f]/;
     if (invalidChars.test(fileName)) {
       return false;
@@ -188,7 +201,7 @@ export class FileRenameService implements vscode.Disposable {
   private async ensureDirectoryExists(dirUri: vscode.Uri): Promise<void> {
     try {
       await vscode.workspace.fs.stat(dirUri);
-    } catch (error) {
+    } catch {
       // ディレクトリが存在しない場合は作成
       await vscode.workspace.fs.createDirectory(dirUri);
     }
@@ -218,10 +231,10 @@ export class FileRenameService implements vscode.Disposable {
       try {
         const dirUri = vscode.Uri.file(dir);
         await this.ensureDirectoryExists(dirUri);
-      } catch (error) {
+      } catch (dirError) {
         errors.push({
           file: previews[0].oldUri, // エラーが発生したディレクトリ内の最初のファイル
-          error: `ディレクトリの作成に失敗しました: ${dir}`
+          error: `ディレクトリの作成に失敗しました: ${dir}${dirError instanceof Error ? ` (${dirError.message})` : ''}`,
         });
         return { successCount: 0, failureCount: previews.length, errors };
       }
@@ -232,13 +245,18 @@ export class FileRenameService implements vscode.Disposable {
 
     for (const preview of previews) {
       try {
-        await vscode.workspace.fs.rename(preview.oldUri, preview.newUri, { overwrite: false });
+        await vscode.workspace.fs.rename(preview.oldUri, preview.newUri, {
+          overwrite: false,
+        });
         fileMapping.push({ from: preview.oldUri, to: preview.newUri });
         successCount++;
       } catch (error) {
         errors.push({
           file: preview.oldUri,
-          error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+          error:
+            error instanceof Error
+              ? error.message
+              : '不明なエラーが発生しました',
         });
       }
     }
@@ -247,7 +265,7 @@ export class FileRenameService implements vscode.Disposable {
     if (fileMapping.length > 0) {
       const history: RenameHistory = {
         fileMapping,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       this.addToHistory(history);
     }
@@ -255,7 +273,7 @@ export class FileRenameService implements vscode.Disposable {
     return {
       successCount,
       failureCount: previews.length - successCount,
-      errors: errors.length > 0 ? errors : undefined
+      errors: errors.length > 0 ? errors : undefined,
     };
   }
 
@@ -264,7 +282,7 @@ export class FileRenameService implements vscode.Disposable {
    */
   private addToHistory(history: RenameHistory): void {
     this._undoHistory.push(history);
-    
+
     // 履歴が最大サイズを超えた場合は古いものを削除
     if (this._undoHistory.length > this._maxHistorySize) {
       this._undoHistory.shift();
@@ -308,7 +326,10 @@ export class FileRenameService implements vscode.Disposable {
       } catch (error) {
         errors.push({
           file: to,
-          error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+          error:
+            error instanceof Error
+              ? error.message
+              : '不明なエラーが発生しました',
         });
       }
     }
@@ -319,7 +340,7 @@ export class FileRenameService implements vscode.Disposable {
     return {
       successCount,
       failureCount: lastHistory.fileMapping.length - successCount,
-      errors: errors.length > 0 ? errors : undefined
+      errors: errors.length > 0 ? errors : undefined,
     };
   }
 
@@ -343,7 +364,10 @@ export class FileRenameService implements vscode.Disposable {
       } catch (error) {
         errors.push({
           file: from,
-          error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+          error:
+            error instanceof Error
+              ? error.message
+              : '不明なエラーが発生しました',
         });
       }
     }
@@ -354,7 +378,7 @@ export class FileRenameService implements vscode.Disposable {
     return {
       successCount,
       failureCount: lastHistory.fileMapping.length - successCount,
-      errors: errors.length > 0 ? errors : undefined
+      errors: errors.length > 0 ? errors : undefined,
     };
   }
 
@@ -364,8 +388,7 @@ export class FileRenameService implements vscode.Disposable {
   dispose(): void {
     this._undoHistory = [];
     this._redoHistory = [];
-    this._disposables.forEach(disposable => disposable.dispose());
+    this._disposables.forEach((disposable) => disposable.dispose());
     this._disposables.length = 0;
   }
 }
-

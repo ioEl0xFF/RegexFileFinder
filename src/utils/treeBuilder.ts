@@ -15,11 +15,9 @@ export class TreeBuilder {
    * ファイルパスのリストから階層ツリー構造を構築
    */
   static buildFileTree(
-    files: vscode.Uri[], 
+    files: vscode.Uri[],
     options: TreeBuildOptions = {}
   ): TreeNode[] {
-    const startTime = Date.now();
-    
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceRoot || files.length === 0) {
       return [];
@@ -28,15 +26,16 @@ export class TreeBuilder {
     try {
       // バッチ処理でノードマップを構築
       const nodeMap = this.buildNodeMap(files, workspaceRoot, options);
-      
+
       // 階層構造を構築
       const rootNodes = this.buildHierarchy(nodeMap, workspaceRoot, options);
-      
-      const buildTime = Date.now() - startTime;
-      
+
       return rootNodes;
     } catch (error) {
-      Logger.logError(error instanceof Error ? error : new Error(String(error)), 'TreeBuilder.buildTree');
+      Logger.logError(
+        error instanceof Error ? error : new Error(String(error)),
+        'TreeBuilder.buildTree'
+      );
       // エラーが発生しても空の配列を返して処理を継続
       return [];
     }
@@ -46,25 +45,27 @@ export class TreeBuilder {
    * ノードマップを構築（バッチ処理対応）
    */
   private static buildNodeMap(
-    files: vscode.Uri[], 
-    workspaceRoot: string, 
+    files: vscode.Uri[],
+    workspaceRoot: string,
     options: TreeBuildOptions
   ): Map<string, TreeNode> {
     const nodeMap = new Map<string, TreeNode>();
-    const batchSize = options.maxDepth ? Math.min(options.maxDepth, this.DEFAULT_BATCH_SIZE) : this.DEFAULT_BATCH_SIZE;
-    
+    const batchSize = options.maxDepth
+      ? Math.min(options.maxDepth, this.DEFAULT_BATCH_SIZE)
+      : this.DEFAULT_BATCH_SIZE;
+
     // ファイルをバッチに分割して処理
     for (let i = 0; i < files.length; i += batchSize) {
       const batch = files.slice(i, i + batchSize);
       this.processBatch(batch, workspaceRoot, nodeMap, options);
-      
+
       // UIをブロックしないように制御を譲る
       if (i + batchSize < files.length) {
         // 非同期処理を同期的に待機（次のイベントループに譲る）
         setImmediate(() => {});
       }
     }
-    
+
     return nodeMap;
   }
 
@@ -72,8 +73,8 @@ export class TreeBuilder {
    * ファイルのバッチを処理
    */
   private static processBatch(
-    files: vscode.Uri[], 
-    workspaceRoot: string, 
+    files: vscode.Uri[],
+    workspaceRoot: string,
     nodeMap: Map<string, TreeNode>,
     options: TreeBuildOptions
   ): void {
@@ -81,17 +82,26 @@ export class TreeBuilder {
       try {
         const relativePath = path.relative(workspaceRoot, fileUri.fsPath);
         const parts = relativePath.split(path.sep);
-        
+
         // 最大深度チェック
         if (options.maxDepth && parts.length > options.maxDepth) {
-          Logger.logWarning(`最大深度を超過: ${relativePath} (深度: ${parts.length}, 最大: ${options.maxDepth})`, 'TreeBuilder');
+          Logger.logWarning(
+            `最大深度を超過: ${relativePath} (深度: ${parts.length}, 最大: ${options.maxDepth})`,
+            'TreeBuilder'
+          );
           continue;
         }
-        
+
         this.createNodesForPath(parts, fileUri, nodeMap);
       } catch (error) {
-        Logger.logWarning(`ファイル処理エラー: ${fileUri.fsPath}`, 'TreeBuilder');
-        Logger.logError(error instanceof Error ? error : new Error(String(error)), 'TreeBuilder.processBatch');
+        Logger.logWarning(
+          `ファイル処理エラー: ${fileUri.fsPath}`,
+          'TreeBuilder'
+        );
+        Logger.logError(
+          error instanceof Error ? error : new Error(String(error)),
+          'TreeBuilder.processBatch'
+        );
       }
     }
   }
@@ -100,24 +110,23 @@ export class TreeBuilder {
    * パスの各部分に対応するノードを作成
    */
   private static createNodesForPath(
-    parts: string[], 
-    fileUri: vscode.Uri, 
+    parts: string[],
+    fileUri: vscode.Uri,
     nodeMap: Map<string, TreeNode>
   ): void {
     let currentPath = '';
-    
+
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
-      const parentPath = currentPath;
       currentPath = currentPath ? path.join(currentPath, part) : part;
-      
+
       if (i === parts.length - 1) {
         // ファイルノード
         if (!nodeMap.has(currentPath)) {
           const fileNode: FileNode = {
             type: 'file',
             label: part,
-            resourceUri: fileUri
+            resourceUri: fileUri,
           };
           nodeMap.set(currentPath, fileNode);
         }
@@ -128,7 +137,7 @@ export class TreeBuilder {
             type: 'folder',
             label: part,
             children: [],
-            collapsibleState: vscode.TreeItemCollapsibleState.Collapsed
+            collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
           };
           nodeMap.set(currentPath, folderNode);
         }
@@ -140,16 +149,16 @@ export class TreeBuilder {
    * フラットなマップから階層構造を構築
    */
   private static buildHierarchy(
-    nodeMap: Map<string, TreeNode>, 
-    workspaceRoot: string, 
+    nodeMap: Map<string, TreeNode>,
+    workspaceRoot: string,
     options: TreeBuildOptions
   ): TreeNode[] {
     const rootNodes: TreeNode[] = [];
-    
+
     // 各ノードを親ノードの children に追加
     for (const [nodePath, node] of nodeMap.entries()) {
       const parentPath = path.dirname(nodePath);
-      
+
       if (parentPath === '.' || parentPath === nodePath) {
         // ルートレベルのノード
         rootNodes.push(node);
@@ -165,12 +174,12 @@ export class TreeBuilder {
         }
       }
     }
-    
+
     // ソート設定に基づいてソート
     if (options.sortFoldersFirst !== false) {
       this.sortTreeNodes(rootNodes);
     }
-    
+
     return rootNodes;
   }
 
@@ -187,12 +196,12 @@ export class TreeBuilder {
         return 1;
       }
       // 名前順（大文字小文字を区別しない）
-      return a.label.localeCompare(b.label, undefined, { 
+      return a.label.localeCompare(b.label, undefined, {
         sensitivity: 'base',
-        numeric: true 
+        numeric: true,
       });
     });
-    
+
     // 子ノードも再帰的にソート
     for (const node of nodes) {
       if (node.children && node.children.length > 0) {
@@ -200,6 +209,4 @@ export class TreeBuilder {
       }
     }
   }
-
 }
-
