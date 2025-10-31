@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { registerSearchCommands } from './commands/searchCommands';
+import { registerAllCommands } from './commands';
 import { SearchInputViewProvider } from './providers/searchInputViewProvider';
 import { SearchTreeProvider } from './providers/searchTreeProvider';
 import { ErrorHandler } from './services/errorHandler';
@@ -47,7 +47,7 @@ export async function activate(
     );
 
     // コマンドの登録
-    registerSearchCommands(context, searchTreeProvider);
+    registerAllCommands(context, searchTreeProvider);
 
     // プロバイダーをコンテキストに追加（クリーンアップ用）
     context.subscriptions.push(searchTreeProvider);

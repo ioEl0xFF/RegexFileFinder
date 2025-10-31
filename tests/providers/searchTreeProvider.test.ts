@@ -1,26 +1,26 @@
 import * as vscode from 'vscode';
-import { SearchTreeProvider } from '../src/providers/searchTreeProvider';
-import { uri } from './testUtils';
+import { SearchTreeProvider } from '../../src/providers/searchTreeProvider';
+import { uri } from '../testUtils';
 
 jest.mock('vscode');
 
 // ConfigService と FileSearchService をモック
-jest.mock('../src/services/configService', () => {
+jest.mock('../../src/services/configService', () => {
   return {
     ConfigService: class {
-      get searchParams() {
+      get searchParams(): { searchPattern: string; includeFolders: string[]; excludeFolders: string[] } {
         return { searchPattern: '.*', includeFolders: ['**/*'], excludeFolders: [] };
       }
-      async setSearchPattern(_p: string) { /* no-op */ }
-      dispose() {}
+      async setSearchPattern(): Promise<void> { /* no-op */ }
+      dispose(): void {}
     }
   };
 });
 
-jest.mock('../src/services/fileSearchService', () => {
+jest.mock('../../src/services/fileSearchService', () => {
   return {
     FileSearchService: class {
-      async searchFiles() {
+      async searchFiles(): Promise<{ success: true; data: { files: ReturnType<typeof uri>[]; totalCount: number; searchTime: number; pattern: string } }> {
         return {
           success: true as const,
           data: {
@@ -31,16 +31,17 @@ jest.mock('../src/services/fileSearchService', () => {
           }
         };
       }
-      dispose() {}
+      dispose(): void {}
     }
   };
 });
 
 describe('SearchTreeProvider', () => {
   beforeEach(() => {
-    (vscode.workspace as any).workspaceFolders = [
-      { uri: { fsPath: '/workspace' } }
-    ];
+    Object.defineProperty(vscode.workspace, 'workspaceFolders', {
+      value: [{ uri: { fsPath: '/workspace' } as vscode.Uri }],
+      writable: true
+    });
   });
   test('refresh でイベントが発火する', () => {
     const provider = new SearchTreeProvider();
@@ -61,5 +62,4 @@ describe('SearchTreeProvider', () => {
     expect(flat).toContain('/workspace/b.tsx');
   });
 });
-
 

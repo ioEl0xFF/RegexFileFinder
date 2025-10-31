@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
-import { FileSearchService } from '../src/services/fileSearchService';
-import type { SearchParams } from '../src/types';
+import { FileSearchService } from '../../src/services/fileSearchService';
+import type { SearchParams } from '../../src/types';
 // JSON は require で読み込む（tsconfig の resolveJsonModule 不要）
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const fileList = require('./__fixtures__/fileList.json') as string[];
-import { uri } from './testUtils';
+const fileList = require('../__fixtures__/fileList.json') as string[];
+import { uri } from '../testUtils';
 
 jest.mock('vscode');
 
@@ -59,5 +59,4 @@ describe('FileSearchService.searchFiles', () => {
     expect(res.success).toBe(false);
   });
 });
-
 

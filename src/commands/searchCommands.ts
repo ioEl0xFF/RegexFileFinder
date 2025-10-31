@@ -54,38 +54,4 @@ export function registerSearchCommands(
       }, 'SearchCommands.collapseAll');
     })
   );
-
-  // ファイル名を置き換え（コマンドパレット経由の呼び出し用）
-  context.subscriptions.push(
-    vscode.commands.registerCommand(
-      'regexFileFinder.executeRename',
-      async () => {
-        await ErrorHandler.handleAsync(async () => {
-          // Webview側のメッセージハンドラーを経由して実行
-          // 実際の処理はSearchInputViewProviderのexecuteRename()で行われる
-          await ErrorHandler.showInfo(t('commands.renameAvailableFromView'));
-        }, 'SearchCommands.executeRename');
-      }
-    )
-  );
-
-  // Undo（コマンドパレット経由の呼び出し用）
-  context.subscriptions.push(
-    vscode.commands.registerCommand('regexFileFinder.undoRename', async () => {
-      await ErrorHandler.handleAsync(async () => {
-        // Webview側のメッセージハンドラーを経由して実行
-        await ErrorHandler.showInfo(t('commands.undoAvailableFromView'));
-      }, 'SearchCommands.undoRename');
-    })
-  );
-
-  // Redo（コマンドパレット経由の呼び出し用）
-  context.subscriptions.push(
-    vscode.commands.registerCommand('regexFileFinder.redoRename', async () => {
-      await ErrorHandler.handleAsync(async () => {
-        // Webview側のメッセージハンドラーを経由して実行
-        await ErrorHandler.showInfo(t('commands.redoAvailableFromView'));
-      }, 'SearchCommands.redoRename');
-    })
-  );
 }

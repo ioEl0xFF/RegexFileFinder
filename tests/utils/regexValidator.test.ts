@@ -1,4 +1,4 @@
-import { RegexValidator } from '../src/utils/regexValidator';
+import { RegexValidator } from '../../src/utils/regexValidator';
 
 describe('RegexValidator.validate', () => {
   test('有効なパターンは isValid=true', () => {
@@ -61,5 +61,4 @@ describe('RegexValidator 追加エッジケース', () => {
     expect(res.isValid).toBe(true);
   });
 });
-
 
