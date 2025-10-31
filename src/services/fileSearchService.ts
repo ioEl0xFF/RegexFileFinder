@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { Result, SearchOptions, SearchParams, SearchResult } from '../types';
 import { RegexValidator } from '../utils/regexValidator';
 import { ERROR_MESSAGES, ErrorHandler, SearchError } from './errorHandler';
+import { Logger } from './logger';
 
 /**
  * ファイル検索サービス
@@ -37,7 +38,7 @@ export class FileSearchService implements vscode.Disposable {
         // キャンセル処理
         token.onCancellationRequested(() => {
           this._currentSearchId = null;
-          console.log('[FileSearchService] 検索がキャンセルされました');
+          Logger.logInfo('検索がキャンセルされました', 'FileSearchService');
         });
 
         // ワークスペースの存在確認

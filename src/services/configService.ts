@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { SearchParams } from '../types';
 import { ConfigError, ERROR_MESSAGES } from './errorHandler';
+import { Logger } from './logger';
 
 /**
  * 検索パラメータの設定管理サービス
@@ -86,7 +87,7 @@ export class ConfigService implements vscode.Disposable {
       await config.update('excludeFolders', this._searchParams.excludeFolders, target);
       await config.update('replacementString', this._replacementString, target);
     } catch (error) {
-      console.error('[ConfigService] 設定保存エラー:', error);
+      Logger.logError(error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR), 'ConfigService.saveConfig');
       throw new ConfigError(ERROR_MESSAGES.CONFIG_SAVE_ERROR, error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR));
     }
   }
@@ -104,7 +105,8 @@ export class ConfigService implements vscode.Disposable {
       };
       this._replacementString = config.get('replacementString', '');
     } catch (error) {
-      console.warn('[ConfigService] 設定読み込みエラー:', error);
+      Logger.logWarning('設定読み込みエラーが発生しました', 'ConfigService');
+      Logger.logError(error instanceof Error ? error : new Error(String(error)), 'ConfigService.loadConfig');
       // デフォルト値を使用（エラーを再スローしない）
       this._searchParams = {
         searchPattern: '',

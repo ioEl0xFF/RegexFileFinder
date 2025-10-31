@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
 import { ERROR_MESSAGES, ErrorHandler } from '../services/errorHandler';
 import { FileRenameService } from '../services/fileRenameService';
+import { Logger } from '../services/logger';
 import { RegexValidator } from '../utils/regexValidator';
 import { SearchTreeProvider } from './searchTreeProvider';
 
@@ -46,7 +47,7 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (message) => {
       try {
         // messageをログに残す
-        console.debug('[regexFileFinder][searchInputViewProvider] 受信メッセージ:', message);
+        Logger.logDebug(`受信メッセージ: ${JSON.stringify(message)}`, 'SearchInputViewProvider');
         switch (message.type) {
           case 'update':
             if (message.field === 'search') {
@@ -173,7 +174,7 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
    */
   private async executeRename(): Promise<void> {
     if (!this.view) {
-      ErrorHandler.logError(new Error('viewが存在しません'), 'SearchInputViewProvider.executeRename');
+      Logger.logError(new Error('viewが存在しません'), 'SearchInputViewProvider.executeRename');
       return;
     }
 
@@ -244,13 +245,13 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
           `一部のファイルの置き換えに失敗しました（${result.failureCount}件）`
         ).catch(error => {
           if (error.name !== 'Canceled') {
-            console.error('[Search] 通知表示エラー:', error);
+            Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchInputViewProvider.showWarning');
           }
         });
       } else {
         ErrorHandler.showInfo(`${result.successCount}件のファイル名を置き換えました`).catch(error => {
           if (error.name !== 'Canceled') {
-            console.error('[Search] 通知表示エラー:', error);
+            Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchInputViewProvider.showInfo');
           }
         });
       }
@@ -284,13 +285,13 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
           `一部のUndo操作に失敗しました（${result.failureCount}件）`
         ).catch(error => {
           if (error.name !== 'Canceled') {
-            console.error('[Search] 通知表示エラー:', error);
+            Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchInputViewProvider.showWarning');
           }
         });
       } else {
         ErrorHandler.showInfo('Undoしました').catch(error => {
           if (error.name !== 'Canceled') {
-            console.error('[Search] 通知表示エラー:', error);
+            Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchInputViewProvider.showInfo');
           }
         });
       }
@@ -324,13 +325,13 @@ export class SearchInputViewProvider implements vscode.WebviewViewProvider {
           `一部のRedo操作に失敗しました（${result.failureCount}件）`
         ).catch(error => {
           if (error.name !== 'Canceled') {
-            console.error('[Search] 通知表示エラー:', error);
+            Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchInputViewProvider.showWarning');
           }
         });
       } else {
         ErrorHandler.showInfo('Redoしました').catch(error => {
           if (error.name !== 'Canceled') {
-            console.error('[Search] 通知表示エラー:', error);
+            Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchInputViewProvider.showInfo');
           }
         });
       }

@@ -1,4 +1,5 @@
 import { ERROR_MESSAGES, RegexError } from '../services/errorHandler';
+import { Logger } from '../services/logger';
 import { RegexValidationResult } from '../types';
 
 /**
@@ -206,7 +207,7 @@ export class RegexValidator {
     }
 
     if (validation.warnings && validation.warnings.length > 0) {
-      console.warn('正規表現の警告:', validation.warnings);
+      Logger.logWarning(`正規表現の警告: ${validation.warnings.join(', ')}`, 'RegexValidator');
     }
 
     return new RegExp(pattern, flags);

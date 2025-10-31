@@ -3,6 +3,7 @@ import { registerSearchCommands } from './commands/searchCommands';
 import { SearchInputViewProvider } from './providers/searchInputViewProvider';
 import { SearchTreeProvider } from './providers/searchTreeProvider';
 import { ERROR_MESSAGES, ErrorHandler } from './services/errorHandler';
+import { Logger } from './services/logger';
 
 /**
  * 拡張機能のアクティベーション処理
@@ -35,15 +36,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(searchTreeProvider);
     context.subscriptions.push(inputProvider);
 
+    // Loggerをコンテキストに追加（クリーンアップ用）
+    const logger = Logger.getInstance();
+    if (logger) {
+      context.subscriptions.push(logger);
+    }
+
     // 初期化時の自動検索実行
     try {
       await searchTreeProvider.executeSearchIfConfigured();
     } catch (error) {
-      console.warn('[RegexFileFinder] 初期化時の自動検索エラー:', error);
+      Logger.logWarning('初期化時の自動検索でエラーが発生しました', 'Extension');
+      Logger.logError(error instanceof Error ? error : new Error(String(error)), 'Extension.activate');
       // エラーが発生しても拡張機能の初期化は継続
     }
   } catch (error) {
-    console.error('[RegexFileFinder] 初期化エラー:', error);
+    Logger.logError(error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR), 'Extension.activate');
     ErrorHandler.showError(
       error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
       'Extension.activate'
@@ -62,7 +70,7 @@ export function deactivate(): void {
   } catch (error) {
     // キャンセルエラーは無視（拡張機能終了時の正常な動作）
     if (error instanceof Error && error.name !== 'Canceled') {
-      console.error('[RegexFileFinder] クリーンアップエラー:', error);
+      Logger.logError(error, 'Extension.deactivate');
     }
   }
 }

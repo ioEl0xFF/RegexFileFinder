@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { Logger } from '../services/logger';
 import { FileNode, FolderNode, TreeBuildOptions, TreeNode } from '../types';
 
 /**
@@ -35,7 +36,7 @@ export class TreeBuilder {
       
       return rootNodes;
     } catch (error) {
-      console.error('[TreeBuilder] ツリー構築エラー:', error);
+      Logger.logError(error instanceof Error ? error : new Error(String(error)), 'TreeBuilder.buildTree');
       // エラーが発生しても空の配列を返して処理を継続
       return [];
     }
@@ -83,13 +84,14 @@ export class TreeBuilder {
         
         // 最大深度チェック
         if (options.maxDepth && parts.length > options.maxDepth) {
-          console.warn(`[TreeBuilder] 最大深度を超過: ${relativePath} (深度: ${parts.length}, 最大: ${options.maxDepth})`);
+          Logger.logWarning(`最大深度を超過: ${relativePath} (深度: ${parts.length}, 最大: ${options.maxDepth})`, 'TreeBuilder');
           continue;
         }
         
         this.createNodesForPath(parts, fileUri, nodeMap);
       } catch (error) {
-        console.warn(`[TreeBuilder] ファイル処理エラー: ${fileUri.fsPath}`, error);
+        Logger.logWarning(`ファイル処理エラー: ${fileUri.fsPath}`, 'TreeBuilder');
+        Logger.logError(error instanceof Error ? error : new Error(String(error)), 'TreeBuilder.processBatch');
       }
     }
   }

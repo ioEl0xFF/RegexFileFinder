@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
 import { ERROR_MESSAGES, ErrorHandler } from '../services/errorHandler';
 import { FileSearchService } from '../services/fileSearchService';
+import { Logger } from '../services/logger';
 import { FolderNode, SearchState, SearchStateInfo, TreeBuildOptions, TreeNode } from '../types';
 import { TreeBuilder } from '../utils/treeBuilder';
 
@@ -164,7 +165,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
           ErrorHandler.showInfo(message).catch(error => {
             // キャンセルエラーは無視（拡張機能終了時の正常な動作）
             if (error.name !== 'Canceled') {
-              console.error('[Search] 通知表示エラー:', error);
+              Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchTreeProvider.showInfo');
             }
           });
         }
@@ -176,7 +177,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
       
       
     } catch (error) {
-      console.error('[Search] executeSearchエラー:', error);
+      Logger.logError(error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR), 'SearchTreeProvider.executeSearch');
       this._searchState = 'error';
       this.refresh();
       await ErrorHandler.showError(
@@ -229,8 +230,8 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
     } catch (error) {
       // キャンセルエラーは無視（拡張機能終了時の正常な動作）
       if (error instanceof Error && error.name !== 'Canceled') {
-        console.error('[Expand] expandAllNodesエラー:', error);
-        console.warn('[SearchTreeProvider] ツリー展開エラー:', error);
+        Logger.logError(error, 'SearchTreeProvider.expandAllNodes');
+        Logger.logWarning('ツリー展開エラーが発生しました', 'SearchTreeProvider');
       }
     }
   }
@@ -261,7 +262,7 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
     } catch (error) {
       // キャンセルエラーは無視（拡張機能終了時の正常な動作）
       if (error instanceof Error && error.name !== 'Canceled') {
-        console.error('[SearchTreeProvider] ツリー折りたたみエラー:', error);
+        Logger.logError(error, 'SearchTreeProvider.collapseAllNodes');
       }
     }
   }
@@ -343,7 +344,8 @@ export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vs
       // 検索を実行
       await this.executeSearch();
     } catch (error) {
-      console.warn('[SearchTreeProvider] 初期化時の自動検索でエラー:', error);
+      Logger.logWarning('初期化時の自動検索でエラーが発生しました', 'SearchTreeProvider');
+      Logger.logError(error instanceof Error ? error : new Error(String(error)), 'SearchTreeProvider.executeSearchIfConfigured');
       // エラーが発生しても初期化処理は継続
     }
   }
