@@ -47,6 +47,13 @@ export enum TreeItemCollapsibleState {
   Expanded = 2,
 }
 
+export enum FileType {
+  Unknown = 0,
+  File = 1,
+  Directory = 2,
+  SymbolicLink = 64,
+}
+
 export type CancellationToken = {
   isCancellationRequested: boolean;
   onCancellationRequested: (cb: () => void) => void;
@@ -57,6 +64,12 @@ const defaultToken: CancellationToken = {
   onCancellationRequested: () => { /* no-op */ },
 };
 
+export class OutputChannel {
+  appendLine = jest.fn((_value: string) => {});
+  show = jest.fn((_preserveFocus?: boolean) => {});
+  dispose = jest.fn(() => {});
+}
+
 export const window = {
   showErrorMessage: jest.fn(async (_msg: string) => undefined),
   showInformationMessage: jest.fn(async (_msg: string) => undefined),
@@ -66,6 +79,7 @@ export const window = {
     return task(progress, defaultToken);
   }),
   registerTreeDataProvider: jest.fn(),
+  createOutputChannel: jest.fn((_name: string) => new OutputChannel()),
 };
 
 export const workspace = {
@@ -73,7 +87,32 @@ export const workspace = {
   findFiles: jest.fn(async (_include?: string, _exclude?: string | null) => {
     return [] as Array<Uri>;
   }),
-  getConfiguration: jest.fn(() => ({ get: jest.fn(() => undefined), update: jest.fn() })),
+  getConfiguration: jest.fn((_section?: string) => ({
+    get: jest.fn((_key: string, defaultValue?: any) => {
+      // ログレベル設定のデフォルト値を返す
+      if (_key === 'logLevel') {
+        return defaultValue || 'INFO';
+      }
+      // ログファイル関連の設定のデフォルト値を返す
+      if (_key === 'logFileEnabled') {
+        return defaultValue || false;
+      }
+      if (_key === 'logFileDirectory') {
+        return defaultValue || '';
+      }
+      return defaultValue;
+    }),
+    update: jest.fn(),
+  })),
+  onDidChangeConfiguration: jest.fn((_listener: (e: any) => any) => ({
+    dispose: () => { /* no-op */ },
+  })),
+  fs: {
+    stat: jest.fn(async (_uri: Uri) => ({ type: 2 })),
+    createDirectory: jest.fn(async (_uri: Uri) => {}),
+    readFile: jest.fn(async (_uri: Uri) => Buffer.from('')),
+    writeFile: jest.fn(async (_uri: Uri, _content: Uint8Array) => {}),
+  },
 };
 
 export const commands = {
@@ -106,6 +145,8 @@ export default {
   ThemeIcon,
   TreeItem,
   TreeItemCollapsibleState,
+  FileType,
+  OutputChannel,
   window,
   workspace,
   commands,
