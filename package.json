@@ -27,6 +27,7 @@
   "categories": [
     "Other"
   ],
+  "icon": "resources/icon.svg",
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
