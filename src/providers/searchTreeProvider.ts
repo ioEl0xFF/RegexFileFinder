@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigService } from '../services/configService';
-import { ERROR_MESSAGES, ErrorHandler } from '../services/errorHandler';
+import { ErrorHandler } from '../services/errorHandler';
 import { FileSearchService } from '../services/fileSearchService';
 import { Logger } from '../services/logger';
 import {
@@ -199,17 +199,13 @@ export class SearchTreeProvider
       }
     } catch (error) {
       Logger.logError(
-        error instanceof Error
-          ? error
-          : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
+        error instanceof Error ? error : new Error(t('errors.unknownError')),
         'SearchTreeProvider.executeSearch'
       );
       this._searchState = 'error';
       this.refresh();
       await ErrorHandler.showError(
-        error instanceof Error
-          ? error
-          : new Error(ERROR_MESSAGES.UNKNOWN_ERROR),
+        error instanceof Error ? error : new Error(t('errors.unknownError')),
         'SearchTreeProvider.executeSearch'
       );
     }

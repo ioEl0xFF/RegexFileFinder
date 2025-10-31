@@ -1,6 +1,7 @@
 import { ERROR_MESSAGES, RegexError } from '../services/errorHandler';
 import { Logger } from '../services/logger';
 import { RegexValidationResult } from '../types';
+import { t } from './i18n';
 
 /**
  * 正規表現バリデーター
@@ -15,7 +16,7 @@ export class RegexValidator {
     // 指数関数的なバックトラッキング（より厳密にチェック）
     /\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*/,
     // 非常に深いネスト（10レベル以上）
-    /\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\)*\)*\)*\)*\)*\)*\)*\)*\)*\)*\)/
+    /\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\)*\)*\)*\)*\)*\)*\)*\)*\)*\)*\)/,
   ];
 
   /**
@@ -23,13 +24,13 @@ export class RegexValidator {
    */
   static validate(pattern: string): RegexValidationResult {
     const warnings: string[] = [];
-    
+
     // 空文字チェック
     if (!pattern || pattern.trim() === '') {
       return {
         isValid: false,
         error: ERROR_MESSAGES.EMPTY_PATTERN,
-        complexity: 'low'
+        complexity: 'low',
       };
     }
 
@@ -38,7 +39,7 @@ export class RegexValidator {
       return {
         isValid: false,
         error: ERROR_MESSAGES.PATTERN_TOO_LONG,
-        complexity: 'high'
+        complexity: 'high',
       };
     }
 
@@ -48,8 +49,8 @@ export class RegexValidator {
     } catch (error) {
       return {
         isValid: false,
-        error: `${ERROR_MESSAGES.INVALID_REGEX}: ${error instanceof Error ? error.message : ERROR_MESSAGES.UNKNOWN_ERROR}`,
-        complexity: 'low'
+        error: `${ERROR_MESSAGES.INVALID_REGEX}: ${error instanceof Error ? error.message : t('errors.unknownError')}`,
+        complexity: 'low',
       };
     }
 
@@ -58,14 +59,16 @@ export class RegexValidator {
       return {
         isValid: false,
         error: ERROR_MESSAGES.DANGEROUS_PATTERN,
-        complexity: 'high'
+        complexity: 'high',
       };
     }
 
     // 複雑度チェック
     const complexity = this.analyzeComplexity(pattern);
     if (complexity === 'high') {
-      warnings.push('正規表現が複雑です。パフォーマンスに影響する可能性があります。');
+      warnings.push(
+        '正規表現が複雑です。パフォーマンスに影響する可能性があります。'
+      );
     }
 
     // パフォーマンス警告
@@ -74,7 +77,7 @@ export class RegexValidator {
     return {
       isValid: true,
       warnings: warnings.length > 0 ? warnings : undefined,
-      complexity
+      complexity,
     };
   }
 
@@ -178,7 +181,10 @@ export class RegexValidator {
   /**
    * パフォーマンス警告を追加
    */
-  private static addPerformanceWarnings(pattern: string, warnings: string[]): void {
+  private static addPerformanceWarnings(
+    pattern: string,
+    warnings: string[]
+  ): void {
     if (pattern.includes('.*.*')) {
       warnings.push('`.*.*` パターンは非効率です。`.*` で十分です。');
     }
@@ -188,11 +194,15 @@ export class RegexValidator {
     }
 
     if (pattern.includes('(.*)*') || pattern.includes('(.*)+')) {
-      warnings.push('`(.*)*` や `(.*)+` パターンは非効率です。より具体的なパターンを使用してください。');
+      warnings.push(
+        '`(.*)*` や `(.*)+` パターンは非効率です。より具体的なパターンを使用してください。'
+      );
     }
 
     if (pattern.length > 200) {
-      warnings.push('正規表現が長いです。分割して複数のパターンに分けることを検討してください。');
+      warnings.push(
+        '正規表現が長いです。分割して複数のパターンに分けることを検討してください。'
+      );
     }
   }
 
@@ -201,32 +211,37 @@ export class RegexValidator {
    */
   static createRegex(pattern: string, flags?: string): RegExp {
     const validation = this.validate(pattern);
-    
+
     if (!validation.isValid) {
-      throw new RegexError(validation.error || ERROR_MESSAGES.INVALID_REGEX, pattern);
+      throw new RegexError(
+        validation.error || ERROR_MESSAGES.INVALID_REGEX,
+        pattern
+      );
     }
 
     if (validation.warnings && validation.warnings.length > 0) {
-      Logger.logWarning(`正規表現の警告: ${validation.warnings.join(', ')}`, 'RegexValidator');
+      Logger.logWarning(
+        `正規表現の警告: ${validation.warnings.join(', ')}`,
+        'RegexValidator'
+      );
     }
 
     return new RegExp(pattern, flags);
   }
-
 
   /**
    * パターンの例を生成
    */
   static generateExamples(): string[] {
     return [
-      '.*\\.ts$',           // TypeScriptファイル
-      '.*\\.tsx$',          // TSXファイル
-      '.*\\.js$',           // JavaScriptファイル
-      '^test.*\\.js$',      // testで始まるJSファイル
-      '.*component.*',      // componentを含むファイル
-      '.*\\.(ts|tsx|js)$',  // 複数拡張子
-      '^[A-Z].*',           // 大文字で始まるファイル
-      '.*\\.test\\.(ts|js)$' // テストファイル
+      '.*\\.ts$', // TypeScriptファイル
+      '.*\\.tsx$', // TSXファイル
+      '.*\\.js$', // JavaScriptファイル
+      '^test.*\\.js$', // testで始まるJSファイル
+      '.*component.*', // componentを含むファイル
+      '.*\\.(ts|tsx|js)$', // 複数拡張子
+      '^[A-Z].*', // 大文字で始まるファイル
+      '.*\\.test\\.(ts|js)$', // テストファイル
     ];
   }
 
@@ -235,8 +250,8 @@ export class RegexValidator {
    */
   static generateDescription(pattern: string): string {
     const examples = this.generateExamples();
-    const matchingExample = examples.find(ex => ex === pattern);
-    
+    const matchingExample = examples.find((ex) => ex === pattern);
+
     if (matchingExample) {
       const descriptions: Record<string, string> = {
         '.*\\.ts$': 'TypeScriptファイル（.ts）',
@@ -246,7 +261,7 @@ export class RegexValidator {
         '.*component.*': 'componentを含むファイル名',
         '.*\\.(ts|tsx|js)$': 'TypeScriptまたはJavaScriptファイル',
         '^[A-Z].*': '大文字で始まるファイル名',
-        '.*\\.test\\.(ts|js)$': 'テストファイル（.test.ts または .test.js）'
+        '.*\\.test\\.(ts|js)$': 'テストファイル（.test.ts または .test.js）',
       };
       return descriptions[matchingExample] || 'カスタムパターン';
     }

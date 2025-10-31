@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { Result, SearchOptions, SearchParams, SearchResult } from '../types';
+import { t } from '../utils/i18n';
 import { RegexValidator } from '../utils/regexValidator';
 import { ERROR_MESSAGES, ErrorHandler, SearchError } from './errorHandler';
 import { Logger } from './logger';
@@ -18,7 +19,7 @@ export class FileSearchService implements vscode.Disposable {
    * ファイル検索を実行
    */
   async searchFiles(
-    params: SearchParams, 
+    params: SearchParams,
     options: SearchOptions = {}
   ): Promise<Result<SearchResult, SearchError>> {
     const searchId = this.generateSearchId();
@@ -26,70 +27,88 @@ export class FileSearchService implements vscode.Disposable {
     this._isSearching = true;
     const startTime = Date.now();
 
-
     // プログレスバーを1つだけ生成
-    return await vscode.window.withProgress({
-      location: vscode.ProgressLocation.Notification,
-      title: 'ファイルを検索中...',
-      cancellable: true
-    }, async (progress, token) => {
-      try {
+    return await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'ファイルを検索中...',
+        cancellable: true,
+      },
+      async (progress, token) => {
+        try {
+          // キャンセル処理
+          token.onCancellationRequested(() => {
+            this._currentSearchId = null;
+            Logger.logInfo('検索がキャンセルされました', 'FileSearchService');
+          });
 
-        // キャンセル処理
-        token.onCancellationRequested(() => {
+          // ワークスペースの存在確認
+          if (
+            !vscode.workspace.workspaceFolders ||
+            vscode.workspace.workspaceFolders.length === 0
+          ) {
+            throw new SearchError(ERROR_MESSAGES.WORKSPACE_NOT_OPEN);
+          }
+
+          // 検索パターンのバリデーション
+          const validation = RegexValidator.validate(params.searchPattern);
+          if (!validation.isValid) {
+            throw new SearchError(
+              validation.error || ERROR_MESSAGES.INVALID_REGEX
+            );
+          }
+
+          // 警告がある場合は表示
+          if (validation.warnings && validation.warnings.length > 0) {
+            await ErrorHandler.showWarning(validation.warnings.join('\n'));
+          }
+
+          // 正規表現を作成
+          const regex = RegexValidator.createRegex(params.searchPattern);
+
+          // ファイル検索を実行（progressとtokenを渡す）
+          const files = await this.performFileSearch(
+            params,
+            regex,
+            options,
+            searchId,
+            progress,
+            token
+          );
+
+          const searchTime = Date.now() - startTime;
+          const result: SearchResult = {
+            files,
+            totalCount: files.length,
+            searchTime,
+            pattern: params.searchPattern,
+          };
+
+          return {
+            success: true as const,
+            data: result,
+          };
+        } catch (error) {
+          const searchError =
+            error instanceof SearchError
+              ? error
+              : new SearchError(
+                  ERROR_MESSAGES.SEARCH_FAILED,
+                  error instanceof Error
+                    ? error
+                    : new Error(t('errors.unknownError'))
+                );
+
+          return {
+            success: false as const,
+            error: searchError,
+          };
+        } finally {
+          this._isSearching = false;
           this._currentSearchId = null;
-          Logger.logInfo('検索がキャンセルされました', 'FileSearchService');
-        });
-
-        // ワークスペースの存在確認
-        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
-          throw new SearchError(ERROR_MESSAGES.WORKSPACE_NOT_OPEN);
         }
-
-        // 検索パターンのバリデーション
-        const validation = RegexValidator.validate(params.searchPattern);
-        if (!validation.isValid) {
-          throw new SearchError(validation.error || ERROR_MESSAGES.INVALID_REGEX);
-        }
-
-        // 警告がある場合は表示
-        if (validation.warnings && validation.warnings.length > 0) {
-          await ErrorHandler.showWarning(validation.warnings.join('\n'));
-        }
-
-        // 正規表現を作成
-        const regex = RegexValidator.createRegex(params.searchPattern);
-
-        // ファイル検索を実行（progressとtokenを渡す）
-        const files = await this.performFileSearch(params, regex, options, searchId, progress, token);
-        
-        const searchTime = Date.now() - startTime;
-        const result: SearchResult = {
-          files,
-          totalCount: files.length,
-          searchTime,
-          pattern: params.searchPattern
-        };
-        
-        return {
-          success: true as const,
-          data: result
-        };
-
-      } catch (error) {
-        const searchError = error instanceof SearchError 
-          ? error 
-          : new SearchError(ERROR_MESSAGES.SEARCH_FAILED, error instanceof Error ? error : new Error(ERROR_MESSAGES.UNKNOWN_ERROR));
-        
-        return {
-          success: false as const,
-          error: searchError
-        };
-      } finally {
-        this._isSearching = false;
-        this._currentSearchId = null;
       }
-    });
+    );
   }
 
   /**
@@ -110,7 +129,7 @@ export class FileSearchService implements vscode.Disposable {
     // グロブパターンでファイル取得
     const includeGlob = this.buildIncludeGlob(params.includeFolders);
     const excludeGlob = this.buildExcludeGlob(params.excludeFolders);
-    
+
     const allFiles = await vscode.workspace.findFiles(includeGlob, excludeGlob);
 
     if (allFiles.length === 0) {
@@ -119,7 +138,6 @@ export class FileSearchService implements vscode.Disposable {
 
     // バッチ処理でフィルタリング
     const matchedFiles: vscode.Uri[] = [];
-    const totalBatches = Math.ceil(allFiles.length / batchSize);
 
     for (let i = 0; i < allFiles.length; i += batchSize) {
       // キャンセルチェック
@@ -128,19 +146,19 @@ export class FileSearchService implements vscode.Disposable {
       }
 
       const batch = allFiles.slice(i, i + batchSize);
-      const batchNumber = Math.floor(i / batchSize) + 1;
+      // バッチ番号は未使用のため削除
 
       // 進捗表示（直接progress.reportを使用）
       if (showProgress) {
         const percentage = Math.round((i / allFiles.length) * 100);
         progress.report({
           message: `ファイルを検索中... (${matchedFiles.length}件見つかりました)`,
-          increment: percentage
+          increment: percentage,
         });
       }
 
       // バッチ内でフィルタリング
-      const batchMatches = batch.filter(file => {
+      const batchMatches = batch.filter((file) => {
         const fileName = path.basename(file.fsPath);
         return regex.test(fileName);
       });
@@ -154,13 +172,12 @@ export class FileSearchService implements vscode.Disposable {
 
       // UIをブロックしないように次のイベントループに制御を譲る
       if (i + batchSize < allFiles.length) {
-        await new Promise(resolve => setImmediate(resolve));
+        await new Promise((resolve) => setImmediate(resolve));
       }
     }
 
     return matchedFiles;
   }
-
 
   /**
    * 含むフォルダのグロブパターンを構築
@@ -169,17 +186,19 @@ export class FileSearchService implements vscode.Disposable {
     if (!includeFolders || includeFolders.length === 0) {
       return '**/*';
     }
-    
+
     // VS Codeのグロブパターン形式: {pattern1,pattern2,pattern3}
-    const patterns = includeFolders.map(folder => folder.trim()).filter(folder => folder.length > 0);
+    const patterns = includeFolders
+      .map((folder) => folder.trim())
+      .filter((folder) => folder.length > 0);
     if (patterns.length === 0) {
       return '**/*';
     }
-    
+
     if (patterns.length === 1) {
       return patterns[0];
     }
-    
+
     return `{${patterns.join(',')}}`;
   }
 
@@ -190,16 +209,18 @@ export class FileSearchService implements vscode.Disposable {
     if (!excludeFolders || excludeFolders.length === 0) {
       return null; // VS Codeのデフォルト除外設定を使用
     }
-    
-    const patterns = excludeFolders.map(folder => folder.trim()).filter(folder => folder.length > 0);
+
+    const patterns = excludeFolders
+      .map((folder) => folder.trim())
+      .filter((folder) => folder.length > 0);
     if (patterns.length === 0) {
       return null;
     }
-    
+
     if (patterns.length === 1) {
       return patterns[0];
     }
-    
+
     return `{${patterns.join(',')}}`;
   }
 
@@ -210,15 +231,13 @@ export class FileSearchService implements vscode.Disposable {
     return `search_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-
   /**
    * リソースをクリーンアップ
    */
   dispose(): void {
     this._currentSearchId = null;
     this._isSearching = false;
-    this._disposables.forEach(disposable => disposable.dispose());
+    this._disposables.forEach((disposable) => disposable.dispose());
     this._disposables.length = 0;
   }
 }
-
