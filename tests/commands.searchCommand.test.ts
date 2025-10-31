@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import * as vscode from 'vscode';
 import { registerSearchCommands } from '../src/commands/searchCommands';
 
@@ -12,9 +13,8 @@ describe('registerSearchCommands', () => {
       expandAllNodes: jest.fn(),
       collapseAllNodes: jest.fn(),
     } as any;
-    const inputProvider = {} as any;
 
-    registerSearchCommands(context, treeProvider, inputProvider);
+    registerSearchCommands(context, treeProvider);
 
     const calls = (vscode.commands.registerCommand as jest.Mock).mock.calls.map(c => c[0]);
     expect(calls).toEqual(
