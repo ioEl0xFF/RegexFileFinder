@@ -1,0 +1,81 @@
+{
+  "errors": {
+    "regexError": "正規表現エラー: {0}\n\n入力されたパターン: \"{1}\"\n\n例:\n• .*\\.tsx$ - TSXファイル\n• ^test.*\\.js$ - testで始まるJSファイル\n• .*component.* - \"component\"を含むファイル",
+    "searchError": "検索エラー: {0}",
+    "configError": "設定エラー: {0}",
+    "renameError": "ファイル名置き換えエラー: {0}",
+    "invalidRegex": "無効な正規表現パターンです",
+    "emptyPattern": "正規表現パターンを入力してください",
+    "workspaceNotOpen": "ワークスペースが開かれていません",
+    "searchFailed": "検索に失敗しました",
+    "fileAccessError": "ファイルアクセスエラーが発生しました",
+    "configSaveError": "設定の保存に失敗しました",
+    "configLoadError": "設定の読み込みに失敗しました",
+    "patternTooComplex": "正規表現パターンが複雑すぎます",
+    "patternTooLong": "正規表現パターンが長すぎます（1000文字以内）",
+    "dangerousPattern": "パフォーマンス上の理由で、このパターンは使用できません",
+    "unknownError": "不明なエラーが発生しました",
+    "cancelled": "操作がキャンセルされました",
+    "noReplacementString": "置換文字列が入力されていません",
+    "invalidFileName": "無効なファイル名です",
+    "duplicateFileName": "同名のファイルが既に存在します",
+    "renameFailed": "ファイル名の置き換えに失敗しました",
+    "directoryCreateFailed": "ディレクトリの作成に失敗しました",
+    "renameValidationFailed": "置き換えの検証に失敗しました",
+    "undoFailed": "Undo操作に失敗しました",
+    "redoFailed": "Redo操作に失敗しました",
+    "noUndoHistory": "Undo履歴がありません",
+    "noRedoHistory": "Redo履歴がありません"
+  },
+  "ui": {
+    "searchPattern": {
+      "label": "検索パターン（正規表現）",
+      "placeholder": "例: .*\\.tsx$",
+      "helpText": "入力すると自動的に検索が実行されます"
+    },
+    "includeFolders": {
+      "label": "含むフォルダ（グロブパターン、カンマ区切り）",
+      "placeholder": "例: **/src/**, **/lib/**",
+      "helpText": "空欄の場合は全フォルダを対象"
+    },
+    "excludeFolders": {
+      "label": "含まないフォルダ（グロブパターン、カンマ区切り）",
+      "placeholder": "例: **/node_modules/**, **/dist/**",
+      "helpText": "検索対象から除外するフォルダ"
+    },
+    "replacement": {
+      "label": "置換文字列",
+      "placeholder": "例: $1_renamed, sub/$1",
+      "helpText": "検索パターンを正規表現として使用します。\\$1, \\$2 などでキャプチャグループを使用可能"
+    },
+    "buttons": {
+      "executeRename": "置き換え実行",
+      "undo": "Undo",
+      "redo": "Redo"
+    },
+    "preview": {
+      "label": "プレビュー:"
+    },
+    "openFile": "ファイルを開く"
+  },
+  "commands": {
+    "resultsCleared": "検索結果をクリアしました",
+    "allFoldersExpanded": "すべてのフォルダを展開しました",
+    "allFoldersCollapsed": "すべてのフォルダを折りたたみました",
+    "renameAvailableFromView": "置き換え機能は検索条件ビューのボタンから利用できます",
+    "undoAvailableFromView": "Undo機能は検索条件ビューのボタンから利用できます",
+    "redoAvailableFromView": "Redo機能は検索条件ビューのボタンから利用できます",
+    "noFilesToRename": "置き換え対象のファイルが見つかりませんでした",
+    "continueRename": "続行",
+    "continueRenameQuestion": "続行しますか？",
+    "renaming": "ファイル名を置き換え中...",
+    "undoing": "Undo中...",
+    "redoing": "Redo中...",
+    "renamePartialFailure": "一部のファイルの置き換えに失敗しました（{0}件）",
+    "renameSuccess": "{0}件のファイル名を置き換えました",
+    "undoPartialFailure": "一部のUndo操作に失敗しました（{0}件）",
+    "undoSuccess": "Undoしました",
+    "redoPartialFailure": "一部のRedo操作に失敗しました（{0}件）",
+    "redoSuccess": "Redoしました"
+  }
+}

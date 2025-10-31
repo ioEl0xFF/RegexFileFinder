@@ -1,0 +1,7 @@
+{
+  "localesPaths": ["locales"],
+  "sourceLanguage": "ja",
+  "displayLanguage": "ja",
+  "keystyle": "nested",
+  "enabledFrameworks": ["custom"]
+}

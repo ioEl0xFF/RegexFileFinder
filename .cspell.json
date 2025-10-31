@@ -1,0 +1,34 @@
+{
+  "version": "0.2",
+  "language": "en,ja",
+  "words": [
+    "pids",
+    "eslintcache",
+    "ehthumbs",
+    "ntvs",
+    "njsproj",
+    "keystyle",
+    "ioel",
+    "ioel0xff",
+    "njsproj",
+    "suo",
+    "vsix",
+    "rpt2",
+    "rts2",
+    "umd",
+    "lcov",
+    "nyc"
+  ],
+  "ignorePaths": [
+    "node_modules/**",
+    "dist/**",
+    "out/**",
+    "coverage/**",
+    ".vscode-test/**",
+    ".webpack/**",
+    "*.tsbuildinfo",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml"
+  ]
+}

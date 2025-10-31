@@ -1,0 +1,19 @@
+{
+  "view.searchInput.name": "Search Conditions",
+  "view.searchResults.name": "Search Results",
+  "command.executeSearch.title": "Execute Search",
+  "command.clearResults.title": "Clear Results",
+  "command.expandAll.title": "Expand All",
+  "command.collapseAll.title": "Collapse All",
+  "command.executeRename.title": "Rename Files",
+  "command.undoRename.title": "Undo",
+  "command.redoRename.title": "Redo",
+  "config.searchPattern.description": "Default search pattern (regex)",
+  "config.includeFolders.description": "Folders to include in search (glob pattern, comma-separated)",
+  "config.excludeFolders.description": "Folders to exclude from search (glob pattern, comma-separated)",
+  "config.replacementString.description": "Replacement string for renaming (uses search pattern as regex)",
+  "config.logLevel.description": "Log output level",
+  "config.logFileEnabled.description": "Enable log file output",
+  "config.logFileDirectory.description": "Directory to save log files (empty uses VS Code extension log directory)",
+  "config.language.description": "Display language (auto: follows VS Code language setting, en: English, ja: Japanese)"
+}

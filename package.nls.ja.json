@@ -1,0 +1,19 @@
+{
+  "view.searchInput.name": "検索条件",
+  "view.searchResults.name": "検索結果",
+  "command.executeSearch.title": "検索を実行",
+  "command.clearResults.title": "検索結果をクリア",
+  "command.expandAll.title": "すべて展開",
+  "command.collapseAll.title": "すべて折りたたむ",
+  "command.executeRename.title": "ファイル名を置き換え",
+  "command.undoRename.title": "Undo",
+  "command.redoRename.title": "Redo",
+  "config.searchPattern.description": "デフォルトの検索パターン（正規表現）",
+  "config.includeFolders.description": "検索対象に含むフォルダ（グロブパターン、カンマ区切りで複数指定可能）",
+  "config.excludeFolders.description": "検索対象から除外するフォルダ（グロブパターン、カンマ区切りで複数指定可能）",
+  "config.replacementString.description": "ファイル名置き換え用の置換文字列（検索パターンを正規表現として使用）",
+  "config.logLevel.description": "ログ出力レベル",
+  "config.logFileEnabled.description": "ログファイルを出力するかどうか",
+  "config.logFileDirectory.description": "ログファイルの保存ディレクトリ（空の場合はVS Code拡張機能のログディレクトリを使用）",
+  "config.language.description": "表示言語（auto: VS Codeの言語設定に自動追従、en: 英語、ja: 日本語）"
+}

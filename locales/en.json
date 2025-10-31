@@ -1,0 +1,81 @@
+{
+  "errors": {
+    "regexError": "Regex Error: {0}\n\nPattern: \"{1}\"\n\nExamples:\n• .*\\.tsx$ - TSX files\n• ^test.*\\.js$ - JS files starting with 'test'\n• .*component.* - Files containing 'component'",
+    "searchError": "Search Error: {0}",
+    "configError": "Configuration Error: {0}",
+    "renameError": "Rename Error: {0}",
+    "invalidRegex": "Invalid regex pattern",
+    "emptyPattern": "Please enter a regex pattern",
+    "workspaceNotOpen": "Workspace is not open",
+    "searchFailed": "Search failed",
+    "fileAccessError": "File access error occurred",
+    "configSaveError": "Failed to save configuration",
+    "configLoadError": "Failed to load configuration",
+    "patternTooComplex": "Regex pattern is too complex",
+    "patternTooLong": "Regex pattern is too long (must be within 1000 characters)",
+    "dangerousPattern": "This pattern cannot be used due to performance reasons",
+    "unknownError": "Unknown error occurred",
+    "cancelled": "Operation was cancelled",
+    "noReplacementString": "Replacement string is not entered",
+    "invalidFileName": "Invalid file name",
+    "duplicateFileName": "A file with the same name already exists",
+    "renameFailed": "Failed to rename files",
+    "directoryCreateFailed": "Failed to create directory",
+    "renameValidationFailed": "Rename validation failed",
+    "undoFailed": "Undo operation failed",
+    "redoFailed": "Redo operation failed",
+    "noUndoHistory": "No undo history",
+    "noRedoHistory": "No redo history"
+  },
+  "ui": {
+    "searchPattern": {
+      "label": "Search Pattern (Regex)",
+      "placeholder": "Example: .*\\.tsx$",
+      "helpText": "Search will be executed automatically when you type"
+    },
+    "includeFolders": {
+      "label": "Include Folders (Glob pattern, comma-separated)",
+      "placeholder": "Example: **/src/**, **/lib/**",
+      "helpText": "Leave blank to search all folders"
+    },
+    "excludeFolders": {
+      "label": "Exclude Folders (Glob pattern, comma-separated)",
+      "placeholder": "Example: **/node_modules/**, **/dist/**",
+      "helpText": "Folders to exclude from search"
+    },
+    "replacement": {
+      "label": "Replacement String",
+      "placeholder": "Example: $1_renamed, sub/$1",
+      "helpText": "Uses the search pattern as a regex. You can use capture groups with $1, $2, etc."
+    },
+    "buttons": {
+      "executeRename": "Execute Rename",
+      "undo": "Undo",
+      "redo": "Redo"
+    },
+    "preview": {
+      "label": "Preview:"
+    },
+    "openFile": "Open File"
+  },
+  "commands": {
+    "resultsCleared": "Search results cleared",
+    "allFoldersExpanded": "All folders expanded",
+    "allFoldersCollapsed": "All folders collapsed",
+    "renameAvailableFromView": "Rename function is available from the button in the search condition view",
+    "undoAvailableFromView": "Undo function is available from the button in the search condition view",
+    "redoAvailableFromView": "Redo function is available from the button in the search condition view",
+    "noFilesToRename": "No files found for renaming",
+    "continueRename": "Continue",
+    "continueRenameQuestion": "Do you want to continue?",
+    "renaming": "Renaming files...",
+    "undoing": "Undoing...",
+    "redoing": "Redoing...",
+    "renamePartialFailure": "Failed to rename some files ({0} files)",
+    "renameSuccess": "Renamed {0} file(s)",
+    "undoPartialFailure": "Some undo operations failed ({0} files)",
+    "undoSuccess": "Undone",
+    "redoPartialFailure": "Some redo operations failed ({0} files)",
+    "redoSuccess": "Redone"
+  }
+}
