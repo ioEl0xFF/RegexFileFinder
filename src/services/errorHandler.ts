@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { Logger } from './logger';
 
 /**
  * カスタムエラークラス群
@@ -62,23 +63,10 @@ export class RenameError extends Error {
  */
 export class ErrorHandler {
   /**
-   * エラーログを出力
-   */
-  static logError(error: Error, context?: string): void {
-    const contextMessage = context ? `[${context}] ` : '';
-    console.error(`${contextMessage}エラー:`, {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      ...(error instanceof RegexError && { pattern: error.pattern })
-    });
-  }
-
-  /**
    * エラーメッセージをユーザーに表示
    */
   static async showError(error: Error, context?: string): Promise<void> {
-    this.logError(error, context);
+    Logger.logError(error, context);
 
     let userMessage: string;
     
@@ -102,7 +90,7 @@ export class ErrorHandler {
     } catch (displayError) {
       // キャンセルエラーは無視（拡張機能終了時の正常な動作）
       if (displayError instanceof Error && displayError.name !== 'Canceled') {
-        console.error('[ErrorHandler] エラー表示エラー:', displayError);
+        Logger.logError(displayError, 'ErrorHandler.showError');
       }
     }
   }
@@ -112,12 +100,12 @@ export class ErrorHandler {
    */
   static async showWarning(message: string): Promise<void> {
     try {
-      console.warn(`警告: ${message}`);
+      Logger.logWarning(message);
       await vscode.window.showWarningMessage(message);
     } catch (error) {
       // キャンセルエラーは無視（拡張機能終了時の正常な動作）
       if (error instanceof Error && error.name !== 'Canceled') {
-        console.error('[ErrorHandler] 警告表示エラー:', error);
+        Logger.logError(error, 'ErrorHandler.showWarning');
       }
     }
   }
@@ -127,12 +115,12 @@ export class ErrorHandler {
    */
   static async showInfo(message: string): Promise<void> {
     try {
-      console.info(`情報: ${message}`);
+      Logger.logInfo(message);
       await vscode.window.showInformationMessage(message);
     } catch (error) {
       // キャンセルエラーは無視（拡張機能終了時の正常な動作）
       if (error instanceof Error && error.name !== 'Canceled') {
-        console.error('[ErrorHandler] 情報表示エラー:', error);
+        Logger.logError(error, 'ErrorHandler.showInfo');
       }
     }
   }
@@ -174,7 +162,7 @@ export class ErrorHandler {
       return operation();
     } catch (error) {
       if (error instanceof Error) {
-        this.logError(error, context);
+        Logger.logError(error, context);
         if (context) {
           vscode.window.showErrorMessage(`${context}: ${error.message}`);
         }
