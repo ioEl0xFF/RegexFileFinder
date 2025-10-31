@@ -34,7 +34,8 @@ src/
 │   └── fileRenameService.ts
 ├── utils/            # ユーティリティ関数
 │   ├── regexValidator.ts
-│   └── treeBuilder.ts
+│   ├── treeBuilder.ts
+│   └── i18n.ts
 ├── types/            # 型定義
 │   └── index.ts
 └── extension.ts      # エントリーポイント
@@ -190,6 +191,10 @@ export type FileExtension = '.ts' | '.tsx' | '.js' | '.jsx';
 
 ```typescript
 // 良い例 - 設定を分離
+import { Logger } from './logger';
+import { t } from '../utils/i18n';
+import { ConfigError, ERROR_MESSAGES } from './errorHandler';
+
 export class ConfigService implements vscode.Disposable {
   private readonly _disposables: vscode.Disposable[] = [];
   private readonly _configKey = 'regexFileFinder';
@@ -198,6 +203,7 @@ export class ConfigService implements vscode.Disposable {
     includeFolders: [],
     excludeFolders: [],
   };
+  private _replacementString = '';
 
   constructor() {
     this.loadConfig();
@@ -208,18 +214,101 @@ export class ConfigService implements vscode.Disposable {
     return { ...this._searchParams };
   }
 
+  get replacementString(): string {
+    return this._replacementString;
+  }
+
   async setSearchPattern(pattern: string): Promise<void> {
     this._searchParams.searchPattern = pattern;
     await this.saveConfig();
   }
 
+  async setIncludeFolders(folders: string[]): Promise<void> {
+    this._searchParams.includeFolders = folders;
+    await this.saveConfig();
+  }
+
+  async setExcludeFolders(folders: string[]): Promise<void> {
+    this._searchParams.excludeFolders = folders;
+    await this.saveConfig();
+  }
+
+  async setReplacementString(replacement: string): Promise<void> {
+    this._replacementString = replacement;
+    await this.saveConfig();
+  }
+
   private async saveConfig(): Promise<void> {
-    const config = vscode.workspace.getConfiguration(this._configKey);
-    await config.update(
-      'searchPattern',
-      this._searchParams.searchPattern,
-      true
-    );
+    try {
+      const config = vscode.workspace.getConfiguration(this._configKey);
+
+      // ワークスペースが開かれている場合はワークスペース設定を優先、そうでなければグローバル設定を使用
+      const target =
+        vscode.workspace.workspaceFolders &&
+        vscode.workspace.workspaceFolders.length > 0
+          ? vscode.ConfigurationTarget.Workspace
+          : vscode.ConfigurationTarget.Global;
+
+      await config.update(
+        'searchPattern',
+        this._searchParams.searchPattern,
+        target
+      );
+      await config.update(
+        'includeFolders',
+        this._searchParams.includeFolders,
+        target
+      );
+      await config.update(
+        'excludeFolders',
+        this._searchParams.excludeFolders,
+        target
+      );
+      await config.update('replacementString', this._replacementString, target);
+    } catch (error) {
+      Logger.logError(
+        error instanceof Error ? error : new Error(t('errors.unknownError')),
+        'ConfigService.saveConfig'
+      );
+      throw new ConfigError(
+        ERROR_MESSAGES.CONFIG_SAVE_ERROR,
+        error instanceof Error ? error : new Error(t('errors.unknownError'))
+      );
+    }
+  }
+
+  private loadConfig(): void {
+    try {
+      const config = vscode.workspace.getConfiguration(this._configKey);
+      this._searchParams = {
+        searchPattern: config.get('searchPattern', ''),
+        includeFolders: config.get('includeFolders', []) || [],
+        excludeFolders: config.get('excludeFolders', []) || [],
+      };
+      this._replacementString = config.get('replacementString', '');
+    } catch (error) {
+      Logger.logWarning('設定読み込みエラーが発生しました', 'ConfigService');
+      Logger.logError(
+        error instanceof Error ? error : new Error(String(error)),
+        'ConfigService.loadConfig'
+      );
+      // デフォルト値を使用（エラーを再スローしない）
+      this._searchParams = {
+        searchPattern: '',
+        includeFolders: [],
+        excludeFolders: [],
+      };
+      this._replacementString = '';
+    }
+  }
+
+  private setupConfigWatcher(): void {
+    const disposable = vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration(this._configKey)) {
+        this.loadConfig();
+      }
+    });
+    this._disposables.push(disposable);
   }
 
   dispose(): void {
@@ -228,6 +317,14 @@ export class ConfigService implements vscode.Disposable {
   }
 }
 ```
+
+**ConfigServiceの特徴：**
+
+- 設定変更を監視（`onDidChangeConfiguration`）して自動的に再読み込み
+- ワークスペースが開かれている場合はワークスペース設定を優先、そうでなければグローバル設定を使用
+- 設定の読み込みエラー時はデフォルト値を使用（エラーを再スローしない）
+- `replacementString`も管理（ファイル名置き換え機能用）
+- 設定の保存時は適切なエラーハンドリングを実施
 
 ### 8. エラーハンドリングの統一
 
@@ -307,6 +404,15 @@ export class TreeBuilder {
     // ツリー構築ロジック
   }
 }
+
+// utils/i18n.ts - 国際化（i18n）専用
+export function t(key: string, ...args: unknown[]): string {
+  // 翻訳を取得
+}
+
+export function initializeI18n(context: vscode.ExtensionContext): void {
+  // i18nを初期化（設定変更の監視を開始）
+}
 ```
 
 **utils/の使用指針:**
@@ -315,6 +421,71 @@ export class TreeBuilder {
 - 複数のモジュールから使用される共通処理
 - 単体テストが容易な純粋関数を推奨
 - サービス層とは異なり、状態を持たない静的メソッドを推奨
+
+### 10. 国際化（i18n）機能
+
+国際化機能は`utils/i18n.ts`に集約し、翻訳ファイル（`locales/*.json`）を管理する：
+
+```typescript
+// utils/i18n.ts - 国際化機能
+import * as vscode from 'vscode';
+
+// 翻訳を取得（プレースホルダー対応）
+export function t(key: string, ...args: unknown[]): string {
+  // 現在の言語設定から翻訳を取得
+  // プレースホルダー（{0}, {1}, ...）を置換
+}
+
+// i18nを初期化（設定変更の監視を開始）
+export function initializeI18n(context: vscode.ExtensionContext): void {
+  // 初期言語設定を読み込む
+  // 設定変更を監視して言語が変わったらキャッシュをクリア
+  configWatcher = vscode.workspace.onDidChangeConfiguration((event) => {
+    if (event.affectsConfiguration('regexFileFinder.language')) {
+      // 言語が変わった場合はキャッシュをクリア
+      clearTranslationCache();
+    }
+  });
+  context.subscriptions.push(configWatcher);
+}
+```
+
+**i18n機能の使用例：**
+
+```typescript
+// extension.ts - 初期化時に呼び出す
+import { initializeI18n, t } from './utils/i18n';
+
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  // i18nの初期化
+  initializeI18n(context);
+  
+  // その他の初期化...
+}
+
+// 各サービス・プロバイダーでの使用
+import { t } from '../utils/i18n';
+
+// 単純な翻訳
+const message = t('errors.invalidRegex');
+
+// プレースホルダーを使用した翻訳
+const message = t('errors.regexError', errorMessage, pattern);
+
+// TreeViewでの使用
+treeItem.command = {
+  command: 'vscode.open',
+  title: t('ui.openFile'),
+  arguments: [element.resourceUri],
+};
+```
+
+**翻訳ファイルの管理：**
+
+- 翻訳ファイルは`locales/`ディレクトリに配置（`locales/ja.json`, `locales/en.json`）
+- ネストされたキー構造を使用（例: `errors.invalidRegex`, `ui.openFile`）
+- VS Codeの設定（`regexFileFinder.language`）で言語を切り替え可能
+- 設定値が`auto`の場合はVS Codeの言語設定から自動検出
 
 ## プロジェクト固有の制約事項
 

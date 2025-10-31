@@ -31,8 +31,17 @@ alwaysApply: true
 
 ```typescript
 // 良い例
+import { initializeI18n } from './utils/i18n';
+import { Logger } from './services/logger';
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   try {
+    // Loggerの初期化（ExtensionContextを設定）
+    Logger.initialize(context);
+
+    // i18nの初期化
+    initializeI18n(context);
+
     // 検索TreeProviderの初期化
     const searchTreeProvider = new SearchTreeProvider();
     
@@ -52,11 +61,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
 
     // コマンドの登録
-    registerSearchCommands(context, searchTreeProvider, inputProvider);
+    registerSearchCommands(context, searchTreeProvider);
 
     // プロバイダーをコンテキストに追加（クリーンアップ用）
     context.subscriptions.push(searchTreeProvider);
     context.subscriptions.push(inputProvider);
+
+    // Loggerをコンテキストに追加（クリーンアップ用）
+    const logger = Logger.getInstance();
+    if (logger) {
+      context.subscriptions.push(logger);
+    }
   } catch (error) {
     ErrorHandler.showError(error instanceof Error ? error : new Error('Unknown error'), 'Extension.activate');
   }
@@ -95,37 +110,69 @@ export function activate(context: vscode.ExtensionContext) {
 **コマンド登録の実装例：**
 
 ```typescript
+import { ErrorHandler } from './services/errorHandler';
+import { t } from './utils/i18n';
+
 export function registerSearchCommands(
   context: vscode.ExtensionContext,
-  treeProvider: SearchTreeProvider,
-  inputProvider: SearchInputViewProvider
+  treeProvider: SearchTreeProvider
 ): void {
-  const disposables = [
-    vscode.commands.registerCommand('regexFileFinder.executeSearch', async () => {
-      await treeProvider.executeSearch();
-    }),
-    vscode.commands.registerCommand('regexFileFinder.clearResults', () => {
-      treeProvider.clearResults();
-    }),
-    vscode.commands.registerCommand('regexFileFinder.expandAll', () => {
-      treeProvider.expandAll();
-    }),
-    vscode.commands.registerCommand('regexFileFinder.collapseAll', () => {
-      treeProvider.collapseAll();
-    }),
-    vscode.commands.registerCommand('regexFileFinder.executeRename', async () => {
-      await inputProvider.executeRename();
-    }),
-    vscode.commands.registerCommand('regexFileFinder.undoRename', async () => {
-      await inputProvider.undoRename();
-    }),
-    vscode.commands.registerCommand('regexFileFinder.redoRename', async () => {
-      await inputProvider.redoRename();
+  // 検索実行
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'regexFileFinder.executeSearch',
+      async () => {
+        await ErrorHandler.handleAsync(async () => {
+          await treeProvider.executeSearch();
+        }, 'SearchCommands.executeSearch');
+      }
+    )
+  );
+
+  // 検索結果クリア
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'regexFileFinder.clearResults',
+      async () => {
+        await ErrorHandler.handleAsync(async () => {
+          treeProvider.clearResults();
+          await ErrorHandler.showInfo(t('commands.resultsCleared'));
+        }, 'SearchCommands.clearResults');
+      }
+    )
+  );
+
+  // すべて展開
+  context.subscriptions.push(
+    vscode.commands.registerCommand('regexFileFinder.expandAll', async () => {
+      await ErrorHandler.handleAsync(async () => {
+        await treeProvider.expandAllNodes();
+        await ErrorHandler.showInfo(t('commands.allFoldersExpanded'));
+      }, 'SearchCommands.expandAll');
     })
-  ];
-  disposables.forEach(d => context.subscriptions.push(d));
+  );
+
+  // すべて折りたたむ
+  context.subscriptions.push(
+    vscode.commands.registerCommand('regexFileFinder.collapseAll', async () => {
+      await ErrorHandler.handleAsync(async () => {
+        await treeProvider.collapseAllNodes();
+        await ErrorHandler.showInfo(t('commands.allFoldersCollapsed'));
+      }, 'SearchCommands.collapseAll');
+    })
+  );
 }
 ```
+
+**ErrorHandler.handleAsync()の使用：**
+
+コマンド登録では`ErrorHandler.handleAsync()`を使用してエラーを統一して処理する：
+
+- 非同期処理を安全に実行し、エラーを自動的に処理
+- キャンセルエラー（`Canceled`）は無視する
+- エラーが発生した場合は`ErrorHandler.showError()`でユーザーに通知
+- フォールバック値を指定可能
+- コンテキスト文字列を指定してエラーの発生箇所を記録
 
 ### 3. TreeDataProvider の実装パターン
 
@@ -396,6 +443,104 @@ export class FileSearchService implements vscode.Disposable {
   }
 }
 ```
+
+### 9. 国際化（i18n）機能の使用
+
+- 拡張機能の初期化時に`initializeI18n()`を呼び出す
+- すべてのユーザー向けメッセージは`t()`関数を使用して翻訳する
+- 翻訳キーはネストされた構造（例: `errors.invalidRegex`）を使用する
+- プレースホルダー（`{0}`, `{1}`, ...）を使用して動的な値を埋め込む
+
+```typescript
+// extension.ts - 初期化
+import { initializeI18n, t } from './utils/i18n';
+
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  // i18nの初期化（設定変更の監視を開始）
+  initializeI18n(context);
+  
+  // その他の初期化...
+}
+
+// サービス・プロバイダーでの使用
+import { t } from '../utils/i18n';
+
+// 単純な翻訳
+const errorMessage = t('errors.invalidRegex');
+
+// プレースホルダーを使用した翻訳
+const errorMessage = t('errors.regexError', error.message, pattern);
+
+// TreeViewでの使用
+treeItem.command = {
+  command: 'vscode.open',
+  title: t('ui.openFile'),
+  arguments: [element.resourceUri],
+};
+
+// エラーハンドラーでの使用
+if (error instanceof RegexError) {
+  userMessage = t('errors.regexError', error.message, error.pattern);
+}
+```
+
+**翻訳ファイルの管理：**
+
+- 翻訳ファイルは`locales/`ディレクトリに配置（`locales/ja.json`, `locales/en.json`）
+- ネストされたキー構造を使用（例: `errors.invalidRegex`, `ui.openFile`）
+- VS Codeの設定（`regexFileFinder.language`）で言語を切り替え可能
+- 設定値が`auto`の場合はVS Codeの言語設定から自動検出
+- 設定変更時にキャッシュが自動的にクリアされる
+
+### 10. ログ出力機能（Logger）の使用
+
+- 拡張機能の初期化時に`Logger.initialize()`を呼び出す
+- すべてのログ出力は`Logger`の静的メソッドを使用する
+- OutputChannelとログファイルの両方に出力される
+- ログレベルは設定で変更可能（DEBUG, INFO, WARN, ERROR）
+
+```typescript
+// extension.ts - 初期化
+import { Logger } from './services/logger';
+
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  // Loggerの初期化（ExtensionContextを設定）
+  Logger.initialize(context);
+  
+  // その他の初期化...
+  
+  // Loggerをコンテキストに追加（クリーンアップ用）
+  const logger = Logger.getInstance();
+  if (logger) {
+    context.subscriptions.push(logger);
+  }
+}
+
+// サービス・プロバイダーでの使用
+import { Logger } from '../services/logger';
+
+// エラーログ
+Logger.logError(error, 'FileSearchService.searchFiles');
+
+// 警告ログ
+Logger.logWarning('正規表現が複雑です', 'RegexValidator');
+
+// 情報ログ
+Logger.logInfo('検索を開始しました', 'FileSearchService');
+
+// デバッグログ
+Logger.logDebug('検索パターン: ' + pattern, 'FileSearchService');
+```
+
+**Loggerの特徴：**
+
+- シングルトンパターンで実装
+- 静的メソッド（`Logger.logError()`, `Logger.logWarning()`, `Logger.logInfo()`, `Logger.logDebug()`）を使用
+- OutputChannel（`Regex File Finder`）とコンソールの両方に出力
+- 設定でログファイルへの出力も可能（`regexFileFinder.logFileEnabled`）
+- ログレベルに応じて出力を制御（`regexFileFinder.logLevel`）
+- エラーログは自動的にOutputChannelを表示
+- Loggerが利用できない場合はconsoleにフォールバック
 
 ## プロジェクト固有の制約事項
 

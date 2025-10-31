@@ -77,7 +77,7 @@ Thumbs.db
 *.sw?
 
 # Cursor AI
-.cursor/
+.cursor/.*/.*
 
 # Optional REPL history
 .node_repl_history

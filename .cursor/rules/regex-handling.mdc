@@ -393,7 +393,163 @@ export class FileRenameService {
 // 検索パターン: ^(.*)\.ts$
 // 置換文字列: $1.component.ts
 // 結果: file.ts → file.component.ts
+
+  /**
+   * ファイル名の置き換えを実行（Undo/Redo対応）
+   */
+  async executeRename(previews: RenamePreview[]): Promise<RenameResult> {
+    if (previews.length === 0) {
+      return { successCount: 0, failureCount: 0 };
+    }
+
+    const errors: Array<{ file: vscode.Uri; error: string }> = [];
+    let successCount = 0;
+    const fileMapping: Array<{ from: vscode.Uri; to: vscode.Uri }> = [];
+
+    // 作成が必要なディレクトリを事前に作成
+    const dirsToCreate = new Set<string>();
+    for (const preview of previews) {
+      if (preview.needsDirectoryMove) {
+        const newDir = path.dirname(preview.newPath);
+        dirsToCreate.add(newDir);
+      }
+    }
+
+    for (const dir of dirsToCreate) {
+      try {
+        const dirUri = vscode.Uri.file(dir);
+        await this.ensureDirectoryExists(dirUri);
+      } catch (error) {
+        errors.push({
+          file: previews[0].oldUri,
+          error: `ディレクトリの作成に失敗しました: ${dir}`
+        });
+        return { successCount: 0, failureCount: previews.length, errors };
+      }
+    }
+
+    // ファイル名の置き換えを実行
+    for (const preview of previews) {
+      try {
+        await vscode.workspace.fs.rename(preview.oldUri, preview.newUri, { overwrite: false });
+        fileMapping.push({ from: preview.oldUri, to: preview.newUri });
+        successCount++;
+      } catch (error) {
+        errors.push({
+          file: preview.oldUri,
+          error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+        });
+      }
+    }
+
+    // 履歴に追加
+    if (fileMapping.length > 0) {
+      const history: RenameHistory = {
+        fileMapping,
+        timestamp: Date.now()
+      };
+      this.addToHistory(history);
+    }
+
+    return {
+      successCount,
+      failureCount: previews.length - successCount,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  }
+
+  /**
+   * Undo: 最後の置き換えを元に戻す
+   */
+  async undo(): Promise<RenameResult> {
+    if (!this.canUndo()) {
+      throw new RenameError(ERROR_MESSAGES.NO_UNDO_HISTORY);
+    }
+
+    const lastHistory = this._undoHistory.pop()!;
+    const errors: Array<{ file: vscode.Uri; error: string }> = [];
+    let successCount = 0;
+
+    // 逆順に元に戻す
+    for (const { from, to } of lastHistory.fileMapping.reverse()) {
+      try {
+        await vscode.workspace.fs.rename(to, from, { overwrite: false });
+        successCount++;
+      } catch (error) {
+        errors.push({
+          file: to,
+          error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+        });
+      }
+    }
+
+    // Redo履歴に追加
+    this._redoHistory.push(lastHistory);
+
+    return {
+      successCount,
+      failureCount: lastHistory.fileMapping.length - successCount,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  }
+
+  /**
+   * Redo: やり直す
+   */
+  async redo(): Promise<RenameResult> {
+    if (!this.canRedo()) {
+      throw new RenameError(ERROR_MESSAGES.NO_REDO_HISTORY);
+    }
+
+    const lastHistory = this._redoHistory.pop()!;
+    const errors: Array<{ file: vscode.Uri; error: string }> = [];
+    let successCount = 0;
+
+    // 再度実行
+    for (const { from, to } of lastHistory.fileMapping) {
+      try {
+        await vscode.workspace.fs.rename(from, to, { overwrite: false });
+        successCount++;
+      } catch (error) {
+        errors.push({
+          file: from,
+          error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+        });
+      }
+    }
+
+    // Undo履歴に追加
+    this._undoHistory.push(lastHistory);
+
+    return {
+      successCount,
+      failureCount: lastHistory.fileMapping.length - successCount,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  }
+
+  private addToHistory(history: RenameHistory): void {
+    this._undoHistory.push(history);
+    
+    // 履歴が最大サイズを超えた場合は古いものを削除
+    if (this._undoHistory.length > this._maxHistorySize) {
+      this._undoHistory.shift();
+    }
+
+    // Redo履歴をクリア（新しい操作が行われたため）
+    this._redoHistory = [];
+  }
+}
 ```
+
+**ファイル名置き換え機能の特徴：**
+
+- プレビュー機能で置換結果を事前確認
+- ファイル名バリデーション（予約文字、予約名のチェック）
+- ディレクトリ作成が必要な場合は自動的に作成
+- Undo/Redo機能で履歴管理（最大10件）
+- 重複ファイル名や既存ファイルとの衝突を検出
+- エラー時の詳細なエラー情報を返す
 
 ## プロジェクト固有の制約事項
 

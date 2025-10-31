@@ -196,6 +196,52 @@ export class ErrorHandler {
       await vscode.window.showErrorMessage(`エラー: ${error.message}`);
     }
   }
+
+  /**
+   * エラーを安全にキャッチして処理（非同期処理用）
+   */
+  static async handleAsync<T>(
+    operation: () => Promise<T>,
+    context?: string,
+    fallback?: T
+  ): Promise<T | undefined> {
+    try {
+      return await operation();
+    } catch (error) {
+      // キャンセルエラーは無視（拡張機能終了時の正常な動作）
+      if (error instanceof Error && error.name === 'Canceled') {
+        return fallback;
+      }
+
+      if (error instanceof Error) {
+        await this.showError(error, context);
+      } else {
+        await this.showError(new Error('Unknown error'), context);
+      }
+      return fallback;
+    }
+  }
+
+  /**
+   * エラーを安全にキャッチして処理（同期的処理用）
+   */
+  static handleSync<T>(
+    operation: () => T,
+    context?: string,
+    fallback?: T
+  ): T | undefined {
+    try {
+      return operation();
+    } catch (error) {
+      if (error instanceof Error) {
+        this.logError(error, context);
+        if (context) {
+          vscode.window.showErrorMessage(`${context}: ${error.message}`);
+        }
+      }
+      return fallback;
+    }
+  }
 }
 
 async function validateRegex(pattern: string): Promise<void> {
@@ -203,6 +249,87 @@ async function validateRegex(pattern: string): Promise<void> {
     new RegExp(pattern);
   } catch (error) {
     throw new RegexError(`無効な正規表現パターン: ${pattern}`, pattern);
+  }
+}
+```
+
+**ErrorHandler.handleAsync()の使用例：**
+
+コマンド登録や非同期処理でエラーを統一して処理する場合に使用する：
+
+```typescript
+// 良い例 - コマンド登録での使用
+import { ErrorHandler } from './services/errorHandler';
+
+export function registerSearchCommands(
+  context: vscode.ExtensionContext,
+  treeProvider: SearchTreeProvider
+): void {
+  // 検索実行
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'regexFileFinder.executeSearch',
+      async () => {
+        await ErrorHandler.handleAsync(async () => {
+          await treeProvider.executeSearch();
+        }, 'SearchCommands.executeSearch');
+      }
+    )
+  );
+
+  // 検索結果クリア
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'regexFileFinder.clearResults',
+      async () => {
+        await ErrorHandler.handleAsync(async () => {
+          treeProvider.clearResults();
+        }, 'SearchCommands.clearResults');
+      }
+    )
+  );
+}
+
+// 良い例 - サービス内での使用
+export class FileSearchService {
+  async searchFiles(pattern: string): Promise<SearchResult[]> {
+    return await ErrorHandler.handleAsync(
+      async () => {
+        // 検索処理
+        const files = await this.performSearch(pattern);
+        return files;
+      },
+      'FileSearchService.searchFiles',
+      [] // エラー時のフォールバック値
+    ) || [];
+  }
+}
+```
+
+**ErrorHandler.handleAsync()の特徴：**
+
+- 非同期処理を安全に実行し、エラーを自動的に処理
+- キャンセルエラー（`Canceled`）は無視する
+- エラーが発生した場合は`ErrorHandler.showError()`でユーザーに通知
+- フォールバック値を指定可能
+- コンテキスト文字列を指定してエラーの発生箇所を記録
+
+**ErrorHandler.handleSync()の使用例：**
+
+同期的処理でエラーを処理する場合に使用する：
+
+```typescript
+// 良い例 - 同期的処理での使用
+export class ConfigService {
+  getSearchPattern(): string {
+    return ErrorHandler.handleSync(
+      () => {
+        const config = vscode.workspace.getConfiguration('regexFileFinder');
+        return config.get<string>('searchPattern', '');
+      },
+      'ConfigService.getSearchPattern',
+      '' // エラー時のフォールバック値
+    ) || '';
   }
 }
 ```
@@ -271,7 +398,7 @@ export interface Failure<E> {
   error: E;
 }
 
-// 使用例
+// 使用例 - 基本的な使用
 async function performOperation(): Promise<Result<string, RegexError>> {
   try {
     const result = await someAsyncOperation();
@@ -280,6 +407,76 @@ async function performOperation(): Promise<Result<string, RegexError>> {
     return { success: false, error: error as RegexError };
   }
 }
+
+// 使用例 - FileSearchServiceでの実装パターン
+export class FileSearchService {
+  async searchFiles(
+    params: SearchParams,
+    options: SearchOptions = {}
+  ): Promise<Result<SearchResult, SearchError>> {
+    try {
+      // 検索パターンのバリデーション
+      const validation = RegexValidator.validate(params.searchPattern);
+      if (!validation.isValid) {
+        return {
+          success: false,
+          error: new SearchError(validation.error || '無効な正規表現パターン')
+        };
+      }
+
+      // ファイル検索を実行
+      const files = await this.performFileSearch(params, options);
+
+      const result: SearchResult = {
+        files,
+        totalCount: files.length,
+        searchTime: Date.now(),
+        pattern: params.searchPattern,
+      };
+
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error) {
+      const searchError =
+        error instanceof SearchError
+          ? error
+          : new SearchError('検索に失敗しました', error instanceof Error ? error : new Error('Unknown error'));
+
+      return {
+        success: false,
+        error: searchError,
+      };
+    }
+  }
+
+  // 使用側での処理
+  async executeSearch(): Promise<void> {
+    const result = await this._fileSearchService.searchFiles(searchParams);
+
+    if (result.success) {
+      // 成功時の処理
+      const searchResult = result.data;
+      Logger.logInfo(`検索完了: ${searchResult.totalCount}件見つかりました`, 'SearchTreeProvider');
+      this.updateSearchResults(searchResult.files);
+    } else {
+      // 失敗時の処理
+      Logger.logError(result.error, 'SearchTreeProvider.executeSearch');
+      await ErrorHandler.showError(result.error, 'SearchTreeProvider.executeSearch');
+    }
+  }
+}
+```
+
+**Result型パターンの特徴：**
+
+- 成功/失敗を型安全に表現できる
+- エラーの種類を型で指定可能（例: `Result<T, SearchError>`）
+- 呼び出し側で`result.success`をチェックして分岐
+- `result.data`で成功時のデータにアクセス
+- `result.error`で失敗時のエラーにアクセス
+- try-catchの代わりに使用することで、エラーハンドリングを統一できる
 
 // 良い例 - ファイル名置き換え関連の型定義
 export interface RenamePreview {
@@ -379,8 +576,158 @@ export class FileRenameService implements vscode.Disposable {
       this._undoHistory.shift();
     }
   }
+
+  /**
+   * Undo可能かチェック
+   */
+  canUndo(): boolean {
+    return this._undoHistory.length > 0;
+  }
+
+  /**
+   * Redo可能かチェック
+   */
+  canRedo(): boolean {
+    return this._redoHistory.length > 0;
+  }
+
+  /**
+   * Undo: 最後の置き換えを元に戻す
+   */
+  async undo(): Promise<RenameResult> {
+    if (!this.canUndo()) {
+      throw new RenameError(ERROR_MESSAGES.NO_UNDO_HISTORY);
+    }
+
+    const lastHistory = this._undoHistory.pop()!;
+    const errors: Array<{ file: vscode.Uri; error: string }> = [];
+    let successCount = 0;
+
+    // 逆順に元に戻す
+    for (const { from, to } of lastHistory.fileMapping.reverse()) {
+      try {
+        await vscode.workspace.fs.rename(to, from, { overwrite: false });
+        successCount++;
+      } catch (error) {
+        errors.push({
+          file: to,
+          error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+        });
+      }
+    }
+
+    // Redo履歴に追加
+    this._redoHistory.push(lastHistory);
+
+    return {
+      successCount,
+      failureCount: lastHistory.fileMapping.length - successCount,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  }
+
+  /**
+   * Redo: やり直す
+   */
+  async redo(): Promise<RenameResult> {
+    if (!this.canRedo()) {
+      throw new RenameError(ERROR_MESSAGES.NO_REDO_HISTORY);
+    }
+
+    const lastHistory = this._redoHistory.pop()!;
+    const errors: Array<{ file: vscode.Uri; error: string }> = [];
+    let successCount = 0;
+
+    // 再度実行
+    for (const { from, to } of lastHistory.fileMapping) {
+      try {
+        await vscode.workspace.fs.rename(from, to, { overwrite: false });
+        successCount++;
+      } catch (error) {
+        errors.push({
+          file: from,
+          error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+        });
+      }
+    }
+
+    // Undo履歴に追加
+    this._undoHistory.push(lastHistory);
+
+    return {
+      successCount,
+      failureCount: lastHistory.fileMapping.length - successCount,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  }
 }
 ```
+
+**Undo/Redo機能の特徴：**
+
+- 履歴は`RenameHistory`型で管理（`fileMapping`と`timestamp`を含む）
+- 最大10件の履歴を保持（`_maxHistorySize`で制限）
+- Undo時に逆順に実行（`reverse()`を使用）
+- 新しい操作が行われた場合はRedo履歴をクリア
+- `canUndo()`と`canRedo()`で操作可能性をチェック
+- エラー時は詳細なエラー情報を返す
+
+### 10. ログ出力機能（Logger）の使用
+
+- すべてのログ出力は`Logger`の静的メソッドを使用する
+- シングルトンパターンで実装されており、`Logger.initialize()`で初期化する
+- LogLevel enumを使用してログレベルを管理する
+
+```typescript
+// 良い例 - Loggerの初期化と使用
+import { Logger, LogLevel } from './services/logger';
+
+// extension.ts - 初期化
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  // Loggerの初期化（ExtensionContextを設定）
+  Logger.initialize(context);
+  
+  // Loggerをコンテキストに追加（クリーンアップ用）
+  const logger = Logger.getInstance();
+  if (logger) {
+    context.subscriptions.push(logger);
+  }
+}
+
+// サービス・プロバイダーでの使用
+import { Logger } from '../services/logger';
+
+// エラーログ（Errorオブジェクト）
+try {
+  await someOperation();
+} catch (error) {
+  Logger.logError(
+    error instanceof Error ? error : new Error(String(error)),
+    'ServiceName.methodName'
+  );
+}
+
+// 警告ログ（文字列）
+if (complexity === 'high') {
+  Logger.logWarning('正規表現が複雑です', 'RegexValidator');
+}
+
+// 情報ログ（文字列）
+Logger.logInfo('検索を開始しました', 'FileSearchService');
+
+// デバッグログ（文字列）
+Logger.logDebug(`検索パターン: ${pattern}`, 'FileSearchService');
+```
+
+**Loggerの特徴：**
+
+- シングルトンパターンで実装（`Logger.getInstance()`で取得）
+- 静的メソッドでログ出力（`Logger.logError()`, `Logger.logWarning()`, `Logger.logInfo()`, `Logger.logDebug()`）
+- OutputChannelとコンソールの両方に出力
+- 設定でログファイルへの出力も可能（`regexFileFinder.logFileEnabled`）
+- ログレベルに応じて出力を制御（`regexFileFinder.logLevel`）
+- エラーログは自動的にOutputChannelを表示
+- Loggerが利用できない場合はconsoleにフォールバック
 
 ## プロジェクト固有の制約事項
 

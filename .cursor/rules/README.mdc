@@ -75,27 +75,33 @@ alwaysApply: false
 ### v2.0.0 (2025-01-XX)
 
 - プロジェクト構造ルールの更新
-  - `utils/` ディレクトリの追加と説明
+  - `utils/` ディレクトリの追加と説明（i18n.ts を含む）
   - ファイル名の更新（searchTreeProvider、searchCommands、searchInputViewProvider）
   - 依存関係図の更新（utils/ を含める）
-  - ConfigService と ErrorHandler の実装例追加
+  - ConfigService の詳細な実装例追加（設定変更監視、ワークスペース/グローバル設定の切り替え）
+  - 国際化（i18n）機能の実装パターン追加
 - VS Code 拡張機能ルールの更新
   - WebviewView の実装パターン追加
   - 新しいコマンド ID の追加（executeSearch、executeRename、undoRename、redoRename、expandAll、collapseAll）
   - TreeView の展開/折りたたみ機能の実装例
   - コマンドパレットからのメニュー統合方法
+  - Logger 機能の使用パターン追加
+  - 国際化（i18n）機能の初期化と使用例
+  - ErrorHandler.handleAsync() の使用パターン追加
 - 正規表現処理ルールの更新
   - RegexValidator クラスの詳細な実装例
   - ReDoS 攻撃防止の具体的なパターン検出方法
   - 正規表現の複雑度評価（low/medium/high）
   - ファイル名置き換えにおける正規表現の使用パターン
   - キャプチャグループと置換文字列の処理方法
+  - FileRenameService の Undo/Redo 機能の詳細な実装例
 - TypeScript 開発ルールの更新
   - カスタムエラークラス群の詳細な実装例（RegexError、SearchError、ConfigError、RenameError）
-  - ErrorHandler クラスの統一パターン
+  - ErrorHandler クラスの統一パターン（handleAsync、handleSync メソッドを含む）
   - 複雑な型定義の管理方法（RenamePreview、RenameHistory、RenameResult など）
-  - Undo/Redo パターンの型安全な実装例
-  - Result 型パターンの使用例
+  - Undo/Redo パターンの型安全な実装例（詳細な実装パターンを含む）
+  - Result 型パターンの詳細な使用例（FileSearchService での実装例を含む）
+  - Logger 機能の使用パターン追加
 
 ### v1.0.0 (2024-12-19)
 
