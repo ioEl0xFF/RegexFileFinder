@@ -42,45 +42,45 @@
       "regexFileFinder": [
         {
           "id": "regexFileFinder.searchInput",
-          "name": "検索条件",
+          "name": "%view.searchInput.name%",
           "type": "webview"
         },
         {
           "id": "regexFileFinder.searchResults",
-          "name": "検索結果"
+          "name": "%view.searchResults.name%"
         }
       ]
     },
     "commands": [
       {
         "command": "regexFileFinder.executeSearch",
-        "title": "検索を実行"
+        "title": "%command.executeSearch.title%"
       },
       {
         "command": "regexFileFinder.clearResults",
-        "title": "検索結果をクリア"
+        "title": "%command.clearResults.title%"
       },
       {
         "command": "regexFileFinder.expandAll",
-        "title": "すべて展開",
+        "title": "%command.expandAll.title%",
         "icon": "$(expand-all)"
       },
       {
         "command": "regexFileFinder.collapseAll",
-        "title": "すべて折りたたむ",
+        "title": "%command.collapseAll.title%",
         "icon": "$(collapse-all)"
       },
       {
         "command": "regexFileFinder.executeRename",
-        "title": "ファイル名を置き換え"
+        "title": "%command.executeRename.title%"
       },
       {
         "command": "regexFileFinder.undoRename",
-        "title": "Undo"
+        "title": "%command.undoRename.title%"
       },
       {
         "command": "regexFileFinder.redoRename",
-        "title": "Redo"
+        "title": "%command.redoRename.title%"
       }
     ],
     "configuration": {
@@ -89,7 +89,7 @@
         "regexFileFinder.searchPattern": {
           "type": "string",
           "default": "",
-          "description": "デフォルトの検索パターン（正規表現）"
+          "description": "%config.searchPattern.description%"
         },
         "regexFileFinder.includeFolders": {
           "type": "array",
@@ -97,7 +97,7 @@
             "type": "string"
           },
           "default": [],
-          "description": "検索対象に含むフォルダ（グロブパターン、カンマ区切りで複数指定可能）"
+          "description": "%config.includeFolders.description%"
         },
         "regexFileFinder.excludeFolders": {
           "type": "array",
@@ -105,12 +105,12 @@
             "type": "string"
           },
           "default": [],
-          "description": "検索対象から除外するフォルダ（グロブパターン、カンマ区切りで複数指定可能）"
+          "description": "%config.excludeFolders.description%"
         },
         "regexFileFinder.replacementString": {
           "type": "string",
           "default": "",
-          "description": "ファイル名置き換え用の置換文字列（検索パターンを正規表現として使用）"
+          "description": "%config.replacementString.description%"
         },
         "regexFileFinder.logLevel": {
           "type": "string",
@@ -121,17 +121,27 @@
             "ERROR"
           ],
           "default": "INFO",
-          "description": "ログ出力レベル"
+          "description": "%config.logLevel.description%"
         },
         "regexFileFinder.logFileEnabled": {
           "type": "boolean",
           "default": false,
-          "description": "ログファイルを出力するかどうか"
+          "description": "%config.logFileEnabled.description%"
         },
         "regexFileFinder.logFileDirectory": {
           "type": "string",
           "default": "",
-          "description": "ログファイルの保存ディレクトリ（空の場合はVS Code拡張機能のログディレクトリを使用）"
+          "description": "%config.logFileDirectory.description%"
+        },
+        "regexFileFinder.language": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "en",
+            "ja"
+          ],
+          "default": "auto",
+          "description": "%config.language.description%"
         }
       }
     },
