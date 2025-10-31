@@ -31,13 +31,35 @@ alwaysApply: true
 
 ```typescript
 // 良い例
-export function activate(context: vscode.ExtensionContext) {
-  const treeProvider = new FileTreeProvider();
-  const disposable = vscode.window.registerTreeDataProvider(
-    "regexFileFinder.results",
-    treeProvider
-  );
-  context.subscriptions.push(disposable);
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  try {
+    // 検索TreeProviderの初期化
+    const searchTreeProvider = new SearchTreeProvider();
+    
+    // TreeViewの登録
+    const treeView = vscode.window.createTreeView('regexFileFinder.searchResults', {
+      treeDataProvider: searchTreeProvider
+    });
+    context.subscriptions.push(treeView);
+
+    // TreeViewインスタンスをプロバイダーに設定
+    searchTreeProvider.setTreeView(treeView);
+
+    // 入力ビュー（WebviewView）の登録
+    const inputProvider = new SearchInputViewProvider(context, searchTreeProvider);
+    context.subscriptions.push(
+      vscode.window.registerWebviewViewProvider(SearchInputViewProvider.viewId, inputProvider)
+    );
+
+    // コマンドの登録
+    registerSearchCommands(context, searchTreeProvider, inputProvider);
+
+    // プロバイダーをコンテキストに追加（クリーンアップ用）
+    context.subscriptions.push(searchTreeProvider);
+    context.subscriptions.push(inputProvider);
+  } catch (error) {
+    ErrorHandler.showError(error instanceof Error ? error : new Error('Unknown error'), 'Extension.activate');
+  }
 }
 
 // 悪い例
@@ -45,7 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Disposableを登録せずにメモリリークの原因となる
   vscode.window.registerTreeDataProvider(
     "regexFileFinder.results",
-    new FileTreeProvider()
+    new SearchTreeProvider()
   );
 }
 ```
@@ -57,44 +79,229 @@ export function activate(context: vscode.ExtensionContext) {
 
 ```typescript
 // 良い例
-"command": "regexFileFinder.search"
+"command": "regexFileFinder.executeSearch"
 "command": "regexFileFinder.clearResults"
+"command": "regexFileFinder.executeRename"
+"command": "regexFileFinder.undoRename"
+"command": "regexFileFinder.redoRename"
+"command": "regexFileFinder.expandAll"
+"command": "regexFileFinder.collapseAll"
 
 // 悪い例
 "command": "search"
 "command": "regexFileFinderSearch"
 ```
 
+**コマンド登録の実装例：**
+
+```typescript
+export function registerSearchCommands(
+  context: vscode.ExtensionContext,
+  treeProvider: SearchTreeProvider,
+  inputProvider: SearchInputViewProvider
+): void {
+  const disposables = [
+    vscode.commands.registerCommand('regexFileFinder.executeSearch', async () => {
+      await treeProvider.executeSearch();
+    }),
+    vscode.commands.registerCommand('regexFileFinder.clearResults', () => {
+      treeProvider.clearResults();
+    }),
+    vscode.commands.registerCommand('regexFileFinder.expandAll', () => {
+      treeProvider.expandAll();
+    }),
+    vscode.commands.registerCommand('regexFileFinder.collapseAll', () => {
+      treeProvider.collapseAll();
+    }),
+    vscode.commands.registerCommand('regexFileFinder.executeRename', async () => {
+      await inputProvider.executeRename();
+    }),
+    vscode.commands.registerCommand('regexFileFinder.undoRename', async () => {
+      await inputProvider.undoRename();
+    }),
+    vscode.commands.registerCommand('regexFileFinder.redoRename', async () => {
+      await inputProvider.redoRename();
+    })
+  ];
+  disposables.forEach(d => context.subscriptions.push(d));
+}
+```
+
 ### 3. TreeDataProvider の実装パターン
 
 - `getTreeItem`と`getChildren`メソッドを適切に実装する
+- `getParent`メソッドを実装すると`reveal`機能が使用可能になる
 - 大量のデータを扱う場合は仮想化を考慮する
 - 更新時は`_onDidChangeTreeData.fire()`を呼び出す
+- TreeView インスタンスを持つことで展開/折りたたみが可能
 
 ```typescript
 // 良い例
-export class FileTreeProvider implements vscode.TreeDataProvider<FileItem> {
-  private _onDidChangeTreeData: vscode.EventEmitter<
-    FileItem | undefined | null | void
-  > = new vscode.EventEmitter<FileItem | undefined | null | void>();
-  readonly onDidChangeTreeData: vscode.Event<
-    FileItem | undefined | null | void
-  > = this._onDidChangeTreeData.event;
+export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode>, vscode.Disposable {
+  private readonly _onDidChangeTreeData = new vscode.EventEmitter<TreeNode | undefined>();
+  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+
+  private readonly _disposables: vscode.Disposable[] = [];
+  private _searchResults: TreeNode[] = [];
+  private _treeView?: vscode.TreeView<TreeNode>;
+
+  setTreeView(treeView: vscode.TreeView<TreeNode>): void {
+    this._treeView = treeView;
+  }
+
+  getTreeItem(element: TreeNode): vscode.TreeItem {
+    const treeItem = new vscode.TreeItem(element.label);
+    
+    if (element.type === 'folder') {
+      const folderNode = element as FolderNode;
+      treeItem.collapsibleState = folderNode.collapsibleState;
+      treeItem.iconPath = vscode.ThemeIcon.Folder;
+    } else if (element.type === 'file') {
+      treeItem.resourceUri = element.resourceUri;
+      treeItem.command = {
+        command: 'vscode.open',
+        title: 'ファイルを開く',
+        arguments: [element.resourceUri]
+      };
+    }
+    
+    return treeItem;
+  }
+
+  getChildren(element?: TreeNode): TreeNode[] {
+    if (!element) {
+      return this._searchResults;
+    }
+    return element.children || [];
+  }
+
+  getParent(element: TreeNode): TreeNode | undefined {
+    // 親ノードを検索するロジック
+    return this.findParentInNodes(this._searchResults, element);
+  }
 
   refresh(): void {
     this._onDidChangeTreeData.fire();
   }
+
+  expandAll(): void {
+    if (!this._treeView) return;
+    const expand = (nodes: TreeNode[]) => {
+      for (const node of nodes) {
+        if (node.type === 'folder') {
+          this._treeView!.reveal(node, { expand: true });
+          if (node.children) {
+            expand(node.children);
+          }
+        }
+      }
+    };
+    expand(this._searchResults);
+  }
+
+  collapseAll(): void {
+    if (!this._treeView) return;
+    // TreeViewの全ノードを折りたたむ処理
+  }
+
+  dispose(): void {
+    this._disposables.forEach(d => d.dispose());
+    this._disposables = [];
+  }
 }
 ```
 
-### 4. VS Code API の適切な使用
+### 4. WebviewView の実装パターン
 
-- `vscode.window.showInputBox`でユーザー入力を取得する
-- `vscode.workspace.findFiles`でファイル検索を行う
-- エラー時は`vscode.window.showErrorMessage`でユーザーに通知する
+- WebviewView を使用してサイドバーにカスタム UI を表示
+- `enableScripts: true` を設定して JavaScript を有効化
+- `onDidReceiveMessage` で Webview からのメッセージを受け取る
+- `webview.postMessage` で Webview にメッセージを送信
 
 ```typescript
 // 良い例
+export class SearchInputViewProvider implements vscode.WebviewViewProvider {
+  public static readonly viewId = 'regexFileFinder.searchInput';
+  
+  private view?: vscode.WebviewView;
+  private readonly _disposables: vscode.Disposable[] = [];
+
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly treeProvider: SearchTreeProvider
+  ) {}
+
+  resolveWebviewView(webviewView: vscode.WebviewView): void {
+    this.view = webviewView;
+    webviewView.webview.options = {
+      enableScripts: true
+    };
+
+    // HTMLコンテンツを設定
+    webviewView.webview.html = this.getHtml();
+
+    // Webviewからのメッセージを処理
+    webviewView.webview.onDidReceiveMessage(async (message) => {
+      switch (message.type) {
+        case 'update':
+          if (message.field === 'search') {
+            const pattern = String(message.value ?? '');
+            await this.treeProvider.updateSearchPattern(pattern);
+            await this.treeProvider.executeSearch();
+          }
+          break;
+      }
+    });
+  }
+
+  private getHtml(): string {
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    /* CSS */
+  </style>
+</head>
+<body>
+  <input type="text" id="searchInput" placeholder="正規表現パターンを入力" />
+  <script>
+    const vscode = acquireVsCodeApi();
+    const input = document.getElementById('searchInput');
+    input.addEventListener('input', (e) => {
+      vscode.postMessage({
+        type: 'update',
+        field: 'search',
+        value: e.target.value
+      });
+    });
+  </script>
+</body>
+</html>`;
+  }
+
+  dispose(): void {
+    this._disposables.forEach(d => d.dispose());
+    this._disposables = [];
+  }
+}
+```
+
+### 5. VS Code API の適切な使用
+
+- `vscode.window.showInputBox`でユーザー入力を取得する（Webview を使用しない場合）
+- `vscode.workspace.findFiles`でファイル検索を行う
+- エラー時は`vscode.window.showErrorMessage`でユーザーに通知する
+- `vscode.window.createTreeView`で TreeView を作成し、展開/折りたたみ機能を提供
+
+```typescript
+// 良い例 - TreeViewの作成
+const treeView = vscode.window.createTreeView('regexFileFinder.searchResults', {
+  treeDataProvider: searchTreeProvider
+});
+context.subscriptions.push(treeView);
+
+// 良い例 - showInputBoxの使用（コマンドパレットから実行する場合）
 const pattern = await vscode.window.showInputBox({
   prompt: "正規表現パターンを入力してください",
   placeHolder: "例: .*\\.tsx$",
@@ -105,7 +312,46 @@ if (!pattern) {
 }
 ```
 
-### 5. パフォーマンス最適化
+### 6. コマンドパレットからのメニュー統合
+
+- `package.json` の `menus.view/title` に追加すると、ビューのタイトルバーにボタンが表示される
+- アイコンは VS Code のアイコンセット（`$(icon-name)`）を使用する
+
+```json
+// package.json
+{
+  "contributes": {
+    "menus": {
+      "view/title": [
+        {
+          "command": "regexFileFinder.expandAll",
+          "when": "view == regexFileFinder.searchResults",
+          "group": "navigation@1"
+        },
+        {
+          "command": "regexFileFinder.collapseAll",
+          "when": "view == regexFileFinder.searchResults",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "regexFileFinder.expandAll",
+        "title": "すべて展開",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "regexFileFinder.collapseAll",
+        "title": "すべて折りたたむ",
+        "icon": "$(collapse-all)"
+      }
+    ]
+  }
+}
+```
+
+### 7. パフォーマンス最適化
 
 - 大量のファイルを処理する際は`setTimeout`や`setImmediate`で非同期処理を分割する
 - 不要なファイル検索を避けるため、適切なフィルタリングを行う
@@ -125,7 +371,7 @@ async function processLargeFileList(files: string[]): Promise<void> {
 }
 ```
 
-### 6. メモリリーク防止
+### 8. メモリリーク防止
 
 - `Disposable`オブジェクトは必ず`dispose()`メソッドを実装する
 - イベントリスナーは適切に削除する
@@ -153,10 +399,12 @@ export class FileSearchService implements vscode.Disposable {
 
 ## プロジェクト固有の制約事項
 
-- RegexFileFinder はファイル検索に特化した拡張機能
+- RegexFileFinder はファイル検索とリネーム機能を持つ拡張機能（v2.0.0）
 - 正規表現の処理は`fileSearchService.ts`に集約する
-- 検索結果の表示は`fileTreeProvider.ts`で管理する
-- コマンドの実装は`commands`ディレクトリに分離する
+- 検索結果の表示は`searchTreeProvider.ts`で管理する
+- コマンドの実装は`commands/searchCommands.ts`に集約する
+- Webview による検索入力 UI は`searchInputViewProvider.ts`で実装
+- 複数のビュー（検索入力、検索結果）を管理する場合は適切に依存関係を管理する
 
 ## 参考資料
 

@@ -119,13 +119,82 @@ function performSearch(pattern: string): void {
 - try-catch-finally を適切に使用する
 - カスタムエラークラスを作成してエラーの種類を区別する
 - エラーメッセージは日本語で分かりやすく記述する
+- エラークラスには`code`プロパティを追加してエラーの種類を識別しやすくする
+- `cause`プロパティで元のエラーを保持する
 
 ```typescript
-// 良い例
-class RegexError extends Error {
-  constructor(message: string, public readonly pattern: string) {
+// 良い例 - カスタムエラークラス群
+export class RegexError extends Error {
+  public readonly pattern: string;
+  public readonly code = 'REGEX_ERROR';
+
+  constructor(message: string, pattern: string) {
     super(message);
-    this.name = "RegexError";
+    this.name = 'RegexError';
+    this.pattern = pattern;
+  }
+}
+
+export class SearchError extends Error {
+  public readonly code = 'SEARCH_ERROR';
+
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+    this.name = 'SearchError';
+  }
+}
+
+export class ConfigError extends Error {
+  public readonly code = 'CONFIG_ERROR';
+
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+    this.name = 'ConfigError';
+  }
+}
+
+export class RenameError extends Error {
+  public readonly code = 'RENAME_ERROR';
+  public readonly fileUri?: vscode.Uri;
+
+  constructor(message: string, fileUri?: vscode.Uri, public readonly cause?: Error) {
+    super(message);
+    this.name = 'RenameError';
+    this.fileUri = fileUri;
+  }
+}
+
+// 統一されたエラーハンドラー
+export class ErrorHandler {
+  static logError(error: Error, context?: string): void {
+    const contextMessage = context ? `[${context}] ` : '';
+    console.error(`${contextMessage}エラー:`, {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      ...(error instanceof RegexError && { pattern: error.pattern }),
+      ...(error instanceof RenameError && { fileUri: error.fileUri })
+    });
+  }
+
+  static async showError(error: Error, context?: string): Promise<void> {
+    this.logError(error, context);
+    // エラーの種類に応じた適切なメッセージを表示
+    if (error instanceof RegexError) {
+      const message = `正規表現エラー: ${error.message}\n\n入力されたパターン: "${error.pattern}"`;
+      await vscode.window.showErrorMessage(message);
+    } else if (error instanceof SearchError) {
+      await vscode.window.showErrorMessage(`検索エラー: ${error.message}`);
+    } else if (error instanceof ConfigError) {
+      await vscode.window.showErrorMessage(`設定エラー: ${error.message}`);
+    } else if (error instanceof RenameError) {
+      await vscode.window.showErrorMessage(`ファイル名置き換えエラー: ${error.message}`);
+    } else if (error.name === 'Canceled') {
+      // キャンセルエラーは表示しない
+      return;
+    } else {
+      await vscode.window.showErrorMessage(`エラー: ${error.message}`);
+    }
   }
 }
 
@@ -182,12 +251,146 @@ class FileRepository implements Repository<FileItem> {
 }
 ```
 
+### 8. 複雑な型定義の管理
+
+- 型定義は`types/index.ts`に集約する
+- 関連する型はグループ化する
+- Result 型パターンを使用して成功/失敗を型安全に表現する
+
+```typescript
+// 良い例 - Result型パターン
+export type Result<T, E = Error> = Success<T> | Failure<E>;
+
+export interface Success<T> {
+  success: true;
+  data: T;
+}
+
+export interface Failure<E> {
+  success: false;
+  error: E;
+}
+
+// 使用例
+async function performOperation(): Promise<Result<string, RegexError>> {
+  try {
+    const result = await someAsyncOperation();
+    return { success: true, data: result };
+  } catch (error) {
+    return { success: false, error: error as RegexError };
+  }
+}
+
+// 良い例 - ファイル名置き換え関連の型定義
+export interface RenamePreview {
+  oldUri: vscode.Uri;
+  newUri: vscode.Uri;
+  oldFileName: string;
+  newFileName: string;
+  oldPath: string;
+  newPath: string;
+  needsDirectoryMove: boolean;
+}
+
+export interface RenameValidationResult {
+  isValid: boolean;
+  error?: string;
+  warnings?: string[];
+  duplicateFiles?: RenamePreview[];
+  directoriesToCreate?: vscode.Uri[];
+}
+
+export interface RenameHistory {
+  fileMapping: Array<{ from: vscode.Uri; to: vscode.Uri }>;
+  timestamp: number;
+}
+
+export interface RenameResult {
+  successCount: number;
+  failureCount: number;
+  errors?: Array<{ file: vscode.Uri; error: string }>;
+}
+```
+
+### 9. Undo/Redo パターンの型安全な実装
+
+- 履歴管理を型安全に実装する
+- ジェネリクスを使用して再利用可能にする
+
+```typescript
+// 良い例 - Undo/Redo機能の実装
+export class FileRenameService implements vscode.Disposable {
+  private _undoHistory: RenameHistory[] = [];
+  private _redoHistory: RenameHistory[] = [];
+  private readonly _maxHistorySize = 10;
+
+  async executeRename(previews: RenamePreview[]): Promise<RenameResult> {
+    const fileMapping: Array<{ from: vscode.Uri; to: vscode.Uri }> = [];
+    let successCount = 0;
+    let failureCount = 0;
+    const errors: Array<{ file: vscode.Uri; error: string }> = [];
+
+    for (const preview of previews) {
+      try {
+        await vscode.workspace.fs.rename(preview.oldUri, preview.newUri, { overwrite: false });
+        fileMapping.push({ from: preview.oldUri, to: preview.newUri });
+        successCount++;
+      } catch (error) {
+        failureCount++;
+        errors.push({
+          file: preview.oldUri,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    // 履歴に追加
+    if (fileMapping.length > 0) {
+      this.addToHistory(fileMapping);
+      // Redo履歴をクリア
+      this._redoHistory = [];
+    }
+
+    return { successCount, failureCount, errors: errors.length > 0 ? errors : undefined };
+  }
+
+  async undo(): Promise<void> {
+    const lastHistory = this._undoHistory.pop();
+    if (!lastHistory) {
+      return;
+    }
+
+    // 逆順にリネームを実行
+    const reverseMapping = lastHistory.fileMapping.slice().reverse();
+    // 実装...
+    
+    // Redo履歴に追加
+    this._redoHistory.push(lastHistory);
+  }
+
+  private addToHistory(fileMapping: Array<{ from: vscode.Uri; to: vscode.Uri }>): void {
+    this._undoHistory.push({
+      fileMapping,
+      timestamp: Date.now()
+    });
+
+    // 履歴サイズ制限
+    if (this._undoHistory.length > this._maxHistorySize) {
+      this._undoHistory.shift();
+    }
+  }
+}
+```
+
 ## プロジェクト固有の制約事項
 
 - VS Code API の型定義（`@types/vscode`）を適切に活用する
 - 正規表現の型安全性を考慮した設計を行う
 - ファイルパスの処理では`vscode.Uri`を使用する
 - 非同期処理では適切なエラーハンドリングを実装する
+- カスタムエラークラスは`services/errorHandler.ts`に集約する
+- 複雑な型定義は`types/index.ts`に集約し、必要に応じてドキュメント化する
+- Undo/Redo機能を実装する際は履歴サイズの制限を設ける
 
 ## 参考資料
 

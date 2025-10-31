@@ -19,17 +19,82 @@ alwaysApply: true
 
 ### 1. 正規表現のバリデーション
 
-- ユーザー入力の正規表現は必ず try-catch で検証する
+- ユーザー入力の正規表現は必ずバリデーションクラスで検証する
 - 無効なパターンの場合は分かりやすいエラーメッセージを表示する
+- 複雑度（low/medium/high）を評価し、警告を表示する
 - テスト用のサンプルパターンを提供する
 
 ```typescript
-// 良い例
-function validateRegexPattern(pattern: string): RegExp {
-  try {
-    return new RegExp(pattern);
-  } catch (error) {
-    throw new Error(`無効な正規表現パターンです: "${pattern}"\n例: .*\\.tsx$`);
+// 良い例 - RegexValidatorクラスの使用
+export class RegexValidator {
+  private static readonly MAX_PATTERN_LENGTH = 1000;
+
+  static validate(pattern: string): RegexValidationResult {
+    const warnings: string[] = [];
+    
+    // 空文字チェック
+    if (!pattern || pattern.trim() === '') {
+      return {
+        isValid: false,
+        error: '正規表現パターンが空です',
+        complexity: 'low'
+      };
+    }
+
+    // 長さチェック
+    if (pattern.length > this.MAX_PATTERN_LENGTH) {
+      return {
+        isValid: false,
+        error: `正規表現パターンが長すぎます（${this.MAX_PATTERN_LENGTH}文字以内）`,
+        complexity: 'high'
+      };
+    }
+
+    // 構文チェック
+    try {
+      new RegExp(pattern);
+    } catch (error) {
+      return {
+        isValid: false,
+        error: `無効な正規表現パターンです: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        complexity: 'low'
+      };
+    }
+
+    // 危険なパターンチェック
+    if (this.isDangerousPattern(pattern)) {
+      return {
+        isValid: false,
+        error: 'パフォーマンス上の理由で、このパターンは使用できません',
+        complexity: 'high'
+      };
+    }
+
+    // 複雑度チェック
+    const complexity = this.analyzeComplexity(pattern);
+    if (complexity === 'high') {
+      warnings.push('正規表現が複雑です。パフォーマンスに影響する可能性があります。');
+    }
+
+    return {
+      isValid: true,
+      warnings: warnings.length > 0 ? warnings : undefined,
+      complexity
+    };
+  }
+
+  static createRegex(pattern: string, flags?: string): RegExp {
+    const validation = this.validate(pattern);
+    
+    if (!validation.isValid) {
+      throw new RegexError(validation.error || '無効なパターンです', pattern);
+    }
+
+    if (validation.warnings && validation.warnings.length > 0) {
+      console.warn('正規表現の警告:', validation.warnings);
+    }
+
+    return new RegExp(pattern, flags);
   }
 }
 
@@ -39,26 +104,116 @@ function validateRegexPattern(pattern: string): RegExp {
 }
 ```
 
-### 2. ユーザー入力のサニタイズ
+### 2. ReDoS 攻撃防止
 
 - 危険なパターン（ReDoS 攻撃など）を事前にチェックする
 - 過度に複雑なパターンは警告を表示する
 - 入力長の制限を設ける
+- 指数関数的なバックトラッキングを検出する
 
 ```typescript
-// 良い例
-function sanitizeRegexPattern(pattern: string): string {
-  // 長すぎるパターンをチェック
-  if (pattern.length > 1000) {
-    throw new Error("正規表現パターンが長すぎます（1000文字以内）");
+// 良い例 - 危険なパターンの検出
+export class RegexValidator {
+  private static readonly DANGEROUS_PATTERNS = [
+    // 非常に長い繰り返し（ReDoS攻撃の原因）
+    /\([^)]*\){50,}/,
+    /\[[^\]]*\]{50,}/,
+    /\{[^}]*\}{50,}/,
+    // 指数関数的なバックトラッキング
+    /\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*\([^)]*\)\*/,
+    // 非常に深いネスト（10レベル以上）
+    /\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\([^)]*\)*\)*\)*\)*\)*\)*\)*\)*\)*\)/
+  ];
+
+  private static isDangerousPattern(pattern: string): boolean {
+    // 基本的な危険パターンのチェック
+    for (const dangerousPattern of this.DANGEROUS_PATTERNS) {
+      if (dangerousPattern.test(pattern)) {
+        return true;
+      }
+    }
+
+    // 追加の危険パターンチェック
+    // 1. 非常に長い繰り返し（{100,}以上）
+    if (/\{[0-9]+,\}/.test(pattern)) {
+      const matches = pattern.match(/\{([0-9]+),\}/g);
+      if (matches) {
+        for (const match of matches) {
+          const num = parseInt(match.match(/\{([0-9]+),\}/)?.[1] || '0');
+          if (num >= 100) {
+            return true;
+          }
+        }
+      }
+    }
+
+    // 2. 連続する量指定子（.*.*.*など）
+    if (/(\*|\+|\?)\1{5,}/.test(pattern)) {
+      return true;
+    }
+
+    // 3. 非常に深いネスト（手動でカウント）
+    let maxNesting = 0;
+    let currentNesting = 0;
+    for (const char of pattern) {
+      if (char === '(') {
+        currentNesting++;
+        maxNesting = Math.max(maxNesting, currentNesting);
+      } else if (char === ')') {
+        currentNesting = Math.max(0, currentNesting - 1);
+      }
+    }
+    if (maxNesting >= 10) {
+      return true;
+    }
+
+    return false;
   }
 
-  // 危険なパターンをチェック（例：ネストした量指定子）
-  if (/(\w+){10,}/.test(pattern)) {
-    throw new Error("パフォーマンス上の理由で、このパターンは使用できません");
+  private static analyzeComplexity(pattern: string): 'low' | 'medium' | 'high' {
+    let score = 0;
+
+    // 基本的な複雑度要因
+    score += (pattern.match(/\(/g) || []).length; // グループ
+    score += (pattern.match(/\[/g) || []).length; // 文字クラス
+    score += (pattern.match(/\{/g) || []).length; // 量指定子
+    score += (pattern.match(/\|/g) || []).length; // 選択
+    score += (pattern.match(/\?/g) || []).length; // オプション
+    score += (pattern.match(/\+/g) || []).length; // 1回以上
+    score += (pattern.match(/\*/g) || []).length; // 0回以上
+
+    // ネストの深さ
+    const maxNesting = this.calculateMaxNesting(pattern);
+    score += maxNesting * 2;
+
+    // 後方参照
+    score += (pattern.match(/\\\d+/g) || []).length * 3;
+
+    // 先読み・後読み
+    score += (pattern.match(/\(\?[=!<]/g) || []).length * 2;
+
+    if (score <= 5) return 'low';
+    if (score <= 15) return 'medium';
+    return 'high';
   }
 
-  return pattern.trim();
+  private static addPerformanceWarnings(pattern: string, warnings: string[]): void {
+    if (pattern.includes('.*.*')) {
+      warnings.push('`.*.*` パターンは非効率です。`.*` で十分です。');
+    }
+
+    if (pattern.includes('[^]')) {
+      warnings.push('`[^]` パターンは `[\\s\\S]` の方が明確です。');
+    }
+
+    if (pattern.includes('(.*)*') || pattern.includes('(.*)+')) {
+      warnings.push('`(.*)*` や `(.*)+` パターンは非効率です。より具体的なパターンを使用してください。');
+    }
+
+    if (pattern.length > 200) {
+      warnings.push('正規表現が長いです。分割して複数のパターンに分けることを検討してください。');
+    }
+  }
 }
 ```
 
@@ -182,12 +337,72 @@ async function searchFilesWithRegex(
 }
 ```
 
+### 8. ファイル名置き換えにおける正規表現の使用
+
+- ファイル名置き換えでは正規表現のキャプチャグループを使用可能
+- 置換文字列では`$1`、`$2`などの後方参照を使用する
+- 置換前にプレビューを表示し、ユーザーの確認を得る
+
+```typescript
+// 良い例 - ファイル名置き換え処理
+export class FileRenameService {
+  previewRename(
+    files: vscode.Uri[],
+    searchPattern: string,
+    replacement: string
+  ): RenamePreview[] {
+    if (!searchPattern || searchPattern.trim() === '') {
+      return [];
+    }
+
+    const regex = new RegExp(searchPattern);
+    const previews: RenamePreview[] = [];
+
+    for (const file of files) {
+      const fileName = path.basename(file.fsPath);
+      const fileDir = path.dirname(file.fsPath);
+
+      // ファイル名に正規表現を適用して新しいファイル名を生成
+      const newFileName = fileName.replace(regex, replacement);
+      
+      // 置換が発生しなかった場合（パターンにマッチしない）はスキップ
+      if (newFileName === fileName) {
+        continue;
+      }
+
+      // 新しいパスを生成
+      const newPath = path.join(fileDir, newFileName);
+      const newUri = vscode.Uri.file(newPath);
+
+      previews.push({
+        oldUri: file,
+        newUri,
+        oldFileName: fileName,
+        newFileName,
+        oldPath: file.fsPath,
+        newPath,
+        needsDirectoryMove: file.fsPath !== newPath
+      });
+    }
+
+    return previews;
+  }
+}
+
+// 使用例
+// 検索パターン: ^(.*)\.ts$
+// 置換文字列: $1.component.ts
+// 結果: file.ts → file.component.ts
+```
+
 ## プロジェクト固有の制約事項
 
-- RegexFileFinder はファイル名検索に特化している
+- RegexFileFinder はファイル名検索とファイル名置き換えに特化している（v2.0.0以降）
 - ファイル内容の検索は対象外
 - VS Code の設定（files.exclude, search.exclude）を尊重する
 - 大量のファイルがあるプロジェクトでもパフォーマンスを維持する
+- ファイル名置き換えでは Undo/Redo 機能を提供する
+- 正規表現のバリデーションは`RegexValidator`クラスを使用する
 
 ## 参考資料
 

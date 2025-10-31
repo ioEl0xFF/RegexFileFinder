@@ -1,7 +1,7 @@
 ---
-title: "プロジェクト構造とアーキテクチャルール"
-description: "ディレクトリ構成、責任分離、ファイル命名規則、モジュール間依存関係、インポート順序、型定義管理、設定分離、エラーハンドリング統一に関するガイドライン"
-tags: ["プロジェクト構造", "アーキテクチャ", "責任分離", "命名規則", "依存関係"]
+title: 'プロジェクト構造とアーキテクチャルール'
+description: 'ディレクトリ構成、責任分離、ファイル命名規則、モジュール間依存関係、インポート順序、型定義管理、設定分離、エラーハンドリング統一に関するガイドライン'
+tags: ['プロジェクト構造', 'アーキテクチャ', '責任分離', '命名規則', '依存関係']
 alwaysApply: true
 ---
 
@@ -23,11 +23,18 @@ alwaysApply: true
 ```
 src/
 ├── commands/          # コマンド実装
-│   └── searchCommand.ts
+│   └── searchCommands.ts
 ├── providers/         # TreeDataProvider等のプロバイダー
-│   └── fileTreeProvider.ts
+│   ├── searchTreeProvider.ts
+│   └── searchInputViewProvider.ts
 ├── services/          # ビジネスロジック
-│   └── fileSearchService.ts
+│   ├── fileSearchService.ts
+│   ├── configService.ts
+│   ├── errorHandler.ts
+│   └── fileRenameService.ts
+├── utils/            # ユーティリティ関数
+│   ├── regexValidator.ts
+│   └── treeBuilder.ts
 ├── types/            # 型定義
 │   └── index.ts
 └── extension.ts      # エントリーポイント
@@ -39,35 +46,44 @@ src/
 
 ```typescript
 // 良い例 - 責任が明確に分離されている
-// commands/searchCommand.ts - コマンドの実行のみ
-export function registerSearchCommand(
+// commands/searchCommands.ts - コマンドの登録のみ
+export function registerSearchCommands(
   context: vscode.ExtensionContext,
-  treeProvider: FileTreeProvider
+  treeProvider: SearchTreeProvider,
+  inputProvider: SearchInputViewProvider
 ): void {
-  const disposable = vscode.commands.registerCommand(
-    "regexFileFinder.search",
-    async () => {
-      const pattern = await vscode.window.showInputBox({
-        prompt: "正規表現パターンを入力",
-      });
-      if (pattern) {
-        await treeProvider.searchFiles(pattern);
+  const disposables = [
+    vscode.commands.registerCommand(
+      'regexFileFinder.executeSearch',
+      async () => {
+        await treeProvider.executeSearch();
       }
-    }
-  );
-  context.subscriptions.push(disposable);
+    ),
+    vscode.commands.registerCommand('regexFileFinder.clearResults', () => {
+      treeProvider.clearResults();
+    }),
+    // ... その他のコマンド
+  ];
+  disposables.forEach((d) => context.subscriptions.push(d));
 }
 
 // services/fileSearchService.ts - ファイル検索ロジックのみ
 export class FileSearchService {
-  async searchFiles(pattern: string): Promise<string[]> {
+  async searchFiles(pattern: string): Promise<vscode.Uri[]> {
     // 検索ロジック
   }
 }
 
-// providers/fileTreeProvider.ts - UI表示のみ
-export class FileTreeProvider implements vscode.TreeDataProvider<FileItem> {
+// providers/searchTreeProvider.ts - UI表示のみ
+export class SearchTreeProvider implements vscode.TreeDataProvider<TreeNode> {
   // TreeDataProviderの実装
+}
+
+// utils/regexValidator.ts - 正規表現バリデーションのみ
+export class RegexValidator {
+  static validate(pattern: string): RegexValidationResult {
+    // バリデーションロジック
+  }
 }
 ```
 
@@ -98,27 +114,33 @@ export class FileSearchService {
 extension.ts
     ↓
 commands/ → providers/ → services/
-    ↓           ↓           ↓
-types/ ← types/ ← types/
+    ↓           ↓           ↓       ↓
+types/ ← types/ ← types/ ← utils/
 ```
 
 - `commands`は`providers`と`types`に依存可能
-- `providers`は`services`と`types`に依存可能
-- `services`は`types`のみに依存可能
+- `providers`は`services`、`utils`と`types`に依存可能
+- `services`は`utils`と`types`に依存可能
+- `utils`は`types`のみに依存可能（必要に応じて`services`のエラークラスに依存可能）
 - `types`は他のモジュールに依存しない
 
 ```typescript
 // 良い例 - 依存関係が適切
-// commands/searchCommand.ts
-import { FileTreeProvider } from "../providers/fileTreeProvider";
-import { SearchResult } from "../types";
+// commands/searchCommands.ts
+import { SearchTreeProvider } from '../providers/searchTreeProvider';
+import { SearchResult } from '../types';
 
-// providers/fileTreeProvider.ts
-import { FileSearchService } from "../services/fileSearchService";
-import { FileItem } from "../types";
+// providers/searchTreeProvider.ts
+import { FileSearchService } from '../services/fileSearchService';
+import { TreeBuilder } from '../utils/treeBuilder';
+import { TreeNode } from '../types';
 
 // services/fileSearchService.ts
-import { SearchResult } from "../types";
+import { SearchResult } from '../types';
+
+// utils/regexValidator.ts
+import { RegexValidationResult } from '../types';
+import { RegexError } from '../services/errorHandler';
 ```
 
 ### 5. インポート順序
@@ -127,17 +149,17 @@ import { SearchResult } from "../types";
 
 ```typescript
 // 1. VS Code API
-import * as vscode from "vscode";
+import * as vscode from 'vscode';
 
 // 2. 外部ライブラリ（現在は使用していない）
 // import axios from 'axios';
 
 // 3. 内部モジュール（相対パス）
-import { FileSearchService } from "../services/fileSearchService";
-import { FileTreeProvider } from "../providers/fileTreeProvider";
+import { FileSearchService } from '../services/fileSearchService';
+import { FileTreeProvider } from '../providers/fileTreeProvider';
 
 // 4. 型定義
-import type { FileItem, SearchResult } from "../types";
+import type { FileItem, SearchResult } from '../types';
 ```
 
 ### 6. 型定義の管理
@@ -159,7 +181,7 @@ export interface SearchResult {
 }
 
 export type SearchPattern = string;
-export type FileExtension = ".ts" | ".tsx" | ".js" | ".jsx";
+export type FileExtension = '.ts' | '.tsx' | '.js' | '.jsx';
 ```
 
 ### 7. 設定とコンフィギュレーション
@@ -168,15 +190,41 @@ export type FileExtension = ".ts" | ".tsx" | ".js" | ".jsx";
 
 ```typescript
 // 良い例 - 設定を分離
-export class ConfigService {
-  static getExcludePatterns(): string[] {
-    const config = vscode.workspace.getConfiguration("files");
-    return config.get("exclude") || {};
+export class ConfigService implements vscode.Disposable {
+  private readonly _disposables: vscode.Disposable[] = [];
+  private readonly _configKey = 'regexFileFinder';
+  private _searchParams: SearchParams = {
+    searchPattern: '',
+    includeFolders: [],
+    excludeFolders: [],
+  };
+
+  constructor() {
+    this.loadConfig();
+    this.setupConfigWatcher();
   }
 
-  static getSearchExcludePatterns(): string[] {
-    const config = vscode.workspace.getConfiguration("search");
-    return config.get("exclude") || {};
+  get searchParams(): Readonly<SearchParams> {
+    return { ...this._searchParams };
+  }
+
+  async setSearchPattern(pattern: string): Promise<void> {
+    this._searchParams.searchPattern = pattern;
+    await this.saveConfig();
+  }
+
+  private async saveConfig(): Promise<void> {
+    const config = vscode.workspace.getConfiguration(this._configKey);
+    await config.update(
+      'searchPattern',
+      this._searchParams.searchPattern,
+      true
+    );
+  }
+
+  dispose(): void {
+    this._disposables.forEach((d) => d.dispose());
+    this._disposables = [];
   }
 }
 ```
@@ -187,25 +235,94 @@ export class ConfigService {
 
 ```typescript
 // 良い例 - 統一されたエラーハンドリング
+// カスタムエラークラス
+export class RegexError extends Error {
+  public readonly pattern: string;
+  public readonly code = 'REGEX_ERROR';
+
+  constructor(message: string, pattern: string) {
+    super(message);
+    this.name = 'RegexError';
+    this.pattern = pattern;
+  }
+}
+
+export class SearchError extends Error {
+  public readonly code = 'SEARCH_ERROR';
+  constructor(
+    message: string,
+    public readonly cause?: Error
+  ) {
+    super(message);
+    this.name = 'SearchError';
+  }
+}
+
+// 統一されたエラーハンドラー
 export class ErrorHandler {
-  static handleSearchError(error: Error, pattern: string): void {
-    console.error("Search error:", error);
-    vscode.window.showErrorMessage(`検索エラー: ${error.message}`);
+  static logError(error: Error, context?: string): void {
+    const contextMessage = context ? `[${context}] ` : '';
+    console.error(`${contextMessage}エラー:`, {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    });
   }
 
-  static handleValidationError(error: Error): void {
-    console.error("Validation error:", error);
-    vscode.window.showWarningMessage(`入力エラー: ${error.message}`);
+  static async showError(error: Error, context?: string): Promise<void> {
+    this.logError(error, context);
+    // エラーの種類に応じた適切なメッセージを表示
+    if (error instanceof RegexError) {
+      vscode.window.showErrorMessage(`正規表現エラー: ${error.message}`);
+    } else if (error instanceof SearchError) {
+      vscode.window.showErrorMessage(`検索エラー: ${error.message}`);
+    }
   }
 }
 ```
 
+### 9. ユーティリティ関数の配置
+
+再利用可能な関数は`utils/`ディレクトリに配置する：
+
+```typescript
+// 良い例 - ユーティリティ関数の分離
+// utils/regexValidator.ts - 正規表現バリデーション専用
+export class RegexValidator {
+  static validate(pattern: string): RegexValidationResult {
+    // バリデーションロジック
+  }
+
+  static createRegex(pattern: string, flags?: string): RegExp {
+    // 安全な正規表現作成
+  }
+}
+
+// utils/treeBuilder.ts - ツリー構築専用
+export class TreeBuilder {
+  static buildFileTree(
+    files: vscode.Uri[],
+    options: TreeBuildOptions = {}
+  ): TreeNode[] {
+    // ツリー構築ロジック
+  }
+}
+```
+
+**utils/の使用指針:**
+
+- 特定のドメインに依存しない汎用的な関数
+- 複数のモジュールから使用される共通処理
+- 単体テストが容易な純粋関数を推奨
+- サービス層とは異なり、状態を持たない静的メソッドを推奨
+
 ## プロジェクト固有の制約事項
 
-- RegexFileFinder は単一機能の拡張機能として設計
+- RegexFileFinder は単一機能の拡張機能として設計（v2.0.0以降は検索とリネーム機能を含む）
 - 複雑な依存関係は避け、シンプルな構造を維持
 - VS Code 拡張機能の制約（バンドルサイズ、パフォーマンス）を考慮
 - 将来の機能拡張を考慮した柔軟な設計
+- Webview を使用した UI 実装（SearchInputViewProvider）を含む
 
 ## 参考資料
 
